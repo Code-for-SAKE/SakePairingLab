@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 50 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "title": { "type": "string", "maxLength": 50 },
+        "contributionScore": { "type": "number" },
+        "tastePreferences": { "type": "object" }
+      },
+      "required": ["id", "displayName", "title", "contributionScore"]
+    },
+    "Sake": {
+      "title": "Sake",
+      "description": "Sake bottle information",
+      "type": "object",
+      "properties": {
+        "brewery": { "type": "string", "maxLength": 100 },
+        "brand": { "type": "string", "maxLength": 100 },
+        "bottle": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "number" },
+        "createdBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["brewery", "brand", "bottle", "createdAt", "createdBy"]
+    },
+    "TasteProfile": {
+      "title": "TasteProfile",
+      "type": "object",
+      "properties": {
+        "broads": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 50 },
+          "maxLength": 10
+        },
+        "specific": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 50 },
+          "maxLength": 20
+        }
+      },
+      "required": ["broads", "specific"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "A user's tasting review of a Sake",
+      "type": "object",
+      "properties": {
+        "sakeId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "rating": { "type": "number" },
+        "aroma": { "$ref": "#/entities/TasteProfile" },
+        "taste": { "$ref": "#/entities/TasteProfile" },
+        "temperature": { "type": "string", "maxLength": 50 },
+        "vessel": { "type": "string", "maxLength": 100 },
+        "pairing": { "type": "string", "maxLength": 200 },
+        "comment": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "number" },
+        "likesCount": { "type": "number" },
+        "questId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["sakeId", "userId", "aroma", "taste", "temperature", "vessel", "pairing", "createdAt", "likesCount"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles"
+    },
+    "/sakes/{sakeId}": {
+      "schema": { "$ref": "#/entities/Sake" },
+      "description": "Stores sake database entries"
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Stores user reviews of sakes"
+    }
+  }
+}

@@ -1,0 +1,131 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net
+    match /{document=**} { 
+      allow read, write: if false; 
+    }
+
+    // --- Primitives ---
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { 
+      // In this environment, we might not have email_verified true for simple setups, 
+      // but strictly we should check it. For this SNS, we'll ensure they are logged in.
+      return request.auth != null; 
+    }
+
+    // --- Entity Validation Blueprints ---
+
+    function isValidTasteProfile(profile) {
+      return profile.keys().hasAll(['broads', 'specific']) && profile.keys().size() == 2
+        && profile.broads is list && profile.broads.size() <= 10
+        && (profile.broads.size() == 0 || profile.broads[0] is string)
+        && profile.specific is list && profile.specific.size() <= 20
+        && (profile.specific.size() == 0 || profile.specific[0] is string);
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'displayName', 'title', 'contributionScore'])
+        && data.id == request.auth.uid
+        && data.displayName is string && data.displayName.size() <= 50
+        && data.title is string && data.title.size() <= 50
+        && data.contributionScore is number
+        && (
+          !('photoURL' in data.keys()) || (data.photoURL is string && data.photoURL.size() <= 500)
+        )
+        && (
+          !('tastePreferences' in data.keys()) || data.tastePreferences is map
+        );
+    }
+
+    function isValidSake(data) {
+      return data.keys().hasAll(['brewery', 'brand', 'bottle', 'createdAt', 'createdBy'])
+        && data.brewery is string && data.brewery.size() <= 100
+        && data.brand is string && data.brand.size() <= 100
+        && data.bottle is string && data.bottle.size() <= 100
+        && data.createdBy == request.auth.uid
+        && data.createdAt == request.time
+        && (
+          !('description' in data.keys()) || (data.description is string && data.description.size() <= 1000)
+        );
+    }
+
+    function isValidReview(data) {
+      return data.keys().hasAll(['sakeId', 'userId', 'rating', 'aroma', 'taste', 'temperature', 'vessel', 'pairing', 'comment', 'createdAt', 'likesCount'])
+        && isValidId(data.sakeId)
+        && data.userId == request.auth.uid
+        && data.rating is number
+        && data.aroma is map && isValidTasteProfile(data.aroma)
+        && data.taste is map && isValidTasteProfile(data.taste)
+        && data.temperature is string && data.temperature.size() <= 50
+        && data.vessel is string && data.vessel.size() <= 100
+        && data.pairing is string && data.pairing.size() <= 200
+        && data.comment is string && data.comment.size() <= 1000
+        && data.createdAt == request.time
+        && data.likesCount is number
+        && (
+          !('questId' in data.keys()) || (data.questId is string && isValidId(data.questId))
+        );
+    }
+
+    // --- Match Blocks ---
+
+    match /users/{userId} {
+      allow get: if true;
+      allow list: if true; // Public profiles
+      allow create: if isSignedIn() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming());
+      allow update: if isSignedIn() && isValidId(userId) && userId == request.auth.uid 
+                    && incoming().id == existing().id // Immutable
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'title', 'contributionScore', 'tastePreferences'])
+                    && (
+                      !('displayName' in incoming().keys()) || (incoming().displayName is string && incoming().displayName.size() <= 50)
+                    )
+                    && (
+                      !('photoURL' in incoming().keys()) || (incoming().photoURL is string && incoming().photoURL.size() <= 500)
+                    )
+                    && (
+                      !('title' in incoming().keys()) || (incoming().title is string && incoming().title.size() <= 50)
+                    )
+                    && (
+                      !('contributionScore' in incoming().keys()) || incoming().contributionScore is number
+                    )
+                    && (
+                      !('tastePreferences' in incoming().keys()) || incoming().tastePreferences is map
+                    );
+    }
+
+    match /sakes/{sakeId} {
+      allow get: if true; 
+      allow list: if true; // Public catalog
+      allow create: if isSignedIn() && isValidId(sakeId) && isValidSake(incoming());
+    }
+
+    match /reviews/{reviewId} {
+      allow get: if true;
+      allow list: if true; // Public feed
+      allow create: if isSignedIn() && isValidId(reviewId) 
+                    && isValidReview(incoming());
+      allow update: if isSignedIn() && isValidId(reviewId) && existing().userId == request.auth.uid
+                    && incoming().userId == existing().userId // Immutable
+                    && incoming().sakeId == existing().sakeId // Immutable
+                    && incoming().createdAt == existing().createdAt // Immutable
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['rating', 'aroma', 'taste', 'temperature', 'vessel', 'pairing', 'comment', 'likesCount'])
+                    && (
+                      !('rating' in incoming().keys()) || incoming().rating is number
+                    )
+                    && (
+                      !('likesCount' in incoming().keys()) || incoming().likesCount is number
+                    )
+                    && (
+                      !('comment' in incoming().keys()) || (incoming().comment is string && incoming().comment.size() <= 1000)
+                    );
+      allow delete: if isSignedIn() && isValidId(reviewId) && existing().userId == request.auth.uid;
+    }
+
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "firestore": {
+    "databaseId": "(default)",
+    "rules": "firestore.rules",
+    "edition": "STANDARD",
+    "dataAccessMode": "FIRESTORE_NATIVE"
+  },
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
