@@ -1,6 +1,53 @@
 import { GoogleGenAI } from '@google/genai';
 
-const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+/**
+ * Retrieves the Gemini API key.
+ * Priority:
+ * 1. Environment variable (server side)
+ * 2. Vite env variable (client side build)
+ * 3. Browser's secure storage (localStorage) set by the user.
+ * If not found, prompts the user to input their API key and stores it securely.
+ */
+export async function getApiKey(): Promise<string> {
+  // Server or build-time environment variables
+  const envKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  if (envKey) return envKey;
+
+  // Browser storage (localStorage). Use a namespaced key.
+  const storageKey = 'gemini_api_key';
+  let stored = '';
+  try {
+    stored = localStorage.getItem(storageKey) ?? '';
+  } catch {
+    // localStorage may be unavailable (e.g., SSR). Ignore.
+  }
+  if (stored) return stored;
+
+  return '';
+}
+
+/**
+ * Allows the user to update their stored Gemini API key.
+ * This can be called from any UI component.
+ */
+export function setUserApiKey(key: string) {
+  try {
+    localStorage.setItem('gemini_api_key', key);
+  } catch {
+    // ignore errors
+  }
+}
+
+/**
+ * Wrapper to obtain API key before generating content.
+ */
+async function resolveApiKey(): Promise<string> {
+  const key = await getApiKey();
+  if (!key) {
+    throw new Error('GEMINI_API_KEYが設定されていません。APIキーを入力してください。');
+  }
+  return key;
+}
 
 export async function generateTasteComment({
   type,
@@ -11,9 +58,7 @@ export async function generateTasteComment({
   selectedWords: string[];
   pastComments: string[];
 }): Promise<string> {
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEYが設定されていません。.envファイルを確認してください。');
-  }
+  const apiKey = await resolveApiKey();
 
   const ai = new GoogleGenAI({ apiKey });
 
