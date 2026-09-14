@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { PenTool, ChevronLeft, Loader2, Star, Heart } from 'lucide-react';
+import { PenTool, ChevronLeft, Loader2, Heart } from 'lucide-react';
+import RatingBadge from '../components/RatingBadge';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Sake, Review, UserProfile } from '../types';
@@ -171,10 +172,7 @@ export default function SakeDetail() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center text-amber-500 bg-amber-50 px-2.5 py-1 rounded-lg">
-                  <Star className="w-4 h-4 fill-amber-400 mr-1" />
-                  <span className="font-bold text-sm">{review.rating}</span>
-                </div>
+                <RatingBadge rating={review.rating} />
               </div>
 
               {review.comment && (
@@ -202,18 +200,28 @@ export default function SakeDetail() {
                 )}
               </div>
 
-              {((review.aroma?.broads && review.aroma.broads.length > 0) || (review.taste?.broads && review.taste.broads.length > 0)) && (
+              {((review.aroma?.broads && review.aroma.broads.length > 0) || (review.taste?.broads && review.taste.broads.length > 0) || review.aroma?.custom || review.taste?.custom) && (
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {review.aroma?.broads?.map((a, i) => (
-                    <span key={i} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                    <span key={`aroma-${i}`} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
                       香: {a}
                     </span>
                   ))}
+                  {review.aroma?.custom && (
+                    <span className="text-xs bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded-full font-medium border border-indigo-200">
+                      香(メモ): {review.aroma.custom}
+                    </span>
+                  )}
                   {review.taste?.broads?.map((t, i) => (
-                    <span key={i} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                    <span key={`taste-${i}`} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
                       味: {t}
                     </span>
                   ))}
+                  {review.taste?.custom && (
+                    <span className="text-xs bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full font-medium border border-emerald-200">
+                      味(メモ): {review.taste.custom}
+                    </span>
+                  )}
                 </div>
               )}
 

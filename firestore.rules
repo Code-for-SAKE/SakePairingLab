@@ -22,11 +22,13 @@ service cloud.firestore {
     // --- Entity Validation Blueprints ---
 
     function isValidTasteProfile(profile) {
-      return profile.keys().hasAll(['broads', 'specific']) && profile.keys().size() == 2
+      return profile.keys().hasAll(['broads', 'specific']) 
+        && profile.keys().hasOnly(['broads', 'specific', 'custom'])
         && profile.broads is list && profile.broads.size() <= 10
         && (profile.broads.size() == 0 || profile.broads[0] is string)
         && profile.specific is list && profile.specific.size() <= 20
-        && (profile.specific.size() == 0 || profile.specific[0] is string);
+        && (profile.specific.size() == 0 || profile.specific[0] is string)
+        && (!('custom' in profile.keys()) || (profile.custom is string && profile.custom.size() <= 200));
     }
 
     function isValidUser(data) {

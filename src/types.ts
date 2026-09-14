@@ -21,6 +21,7 @@ export type Sake = {
 export type TasteProfile = {
   broads: string[];
   specific: string[];
+  custom?: string;
 };
 
 export type Review = {

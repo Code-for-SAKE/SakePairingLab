@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Check, Frown, Smile, Sparkles, Lock } from 'lucide-react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ChevronLeft, ChevronRight, Check, Frown, Smile, Sparkles, Lock, Loader2 } from 'lucide-react';
+import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { Review } from '../types';
+import { generateTasteComment } from '../lib/gemini';
 import clsx from 'clsx';
 
 const AROMA_TREE = {
@@ -39,14 +41,115 @@ export default function NewReview() {
   
   const [aromaBroads, setAromaBroads] = useState<string[]>([]);
   const [aromaSpecific, setAromaSpecific] = useState<string[]>([]);
+  const [aromaCustom, setAromaCustom] = useState('');
+  const [generatingAroma, setGeneratingAroma] = useState(false);
   
   const [tasteBroads, setTasteBroads] = useState<string[]>([]);
   const [tasteSpecific, setTasteSpecific] = useState<string[]>([]);
+  const [tasteCustom, setTasteCustom] = useState('');
+  const [generatingTaste, setGeneratingTaste] = useState(false);
 
   const [temperature, setTemperature] = useState('常温 (20℃)');
   const [vessel, setVessel] = useState('お猪口');
   const [pairing, setPairing] = useState('');
   const [comment, setComment] = useState('');
+
+  // ユーザーの最新最大30件の投稿コメントを取得する（orderBy + limit を使用）
+  const fetchUserRecentComments = async (): Promise<string[]> => {
+    if (!user) return [];
+    try {
+      // 複合インデックス (userId ASC, createdAt DESC) を使ってサーバー側で最新30件に絞り込み
+      const q = query(
+        collection(db, 'reviews'),
+        where('userId', '==', user.uid),
+        orderBy('createdAt', 'desc'),
+        limit(30)
+      );
+      const snap = await getDocs(q);
+      const pastComments: string[] = [];
+      snap.docs.forEach(doc => {
+        const data = doc.data() as Review;
+        if (data.comment && data.comment.trim()) {
+          pastComments.push(data.comment.trim());
+        }
+      });
+      return pastComments;
+    } catch (err: any) {
+      console.warn('Firestore query with orderBy failed (composite index might be building), falling back to client sort:', err);
+      // インデックス未作成・構築中の場合の安全なフォールバック
+      try {
+        const fallbackQuery = query(
+          collection(db, 'reviews'),
+          where('userId', '==', user.uid)
+        );
+        const snap = await getDocs(fallbackQuery);
+        const userReviews = snap.docs.map(doc => doc.data() as Review);
+        userReviews.sort((a, b) => {
+          const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+          const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+          return timeB - timeA;
+        });
+
+        const comments: string[] = [];
+        for (const r of userReviews) {
+          if (r.comment && r.comment.trim()) {
+            comments.push(r.comment.trim());
+          }
+          if (comments.length >= 30) break;
+        }
+        return comments;
+      } catch (fallbackErr) {
+        console.error('Failed to fetch user past comments:', fallbackErr);
+        return [];
+      }
+    }
+  };
+
+  const handleGenerateAromaAI = async () => {
+    const selectedWords = [...aromaBroads, ...aromaSpecific];
+    if (selectedWords.length === 0) {
+      alert('上の選択肢から香りのキーワードを1つ以上選択してください。');
+      return;
+    }
+    setGeneratingAroma(true);
+    try {
+      const pastComments = await fetchUserRecentComments();
+      const generated = await generateTasteComment({
+        type: '香りの印象',
+        selectedWords,
+        pastComments,
+      });
+      setAromaCustom(generated);
+    } catch (err: any) {
+      console.error(err);
+      alert(`コメント生成に失敗しました: ${err.message || 'エラーが発生しました'}`);
+    } finally {
+      setGeneratingAroma(false);
+    }
+  };
+
+  const handleGenerateTasteAI = async () => {
+    const selectedWords = [...tasteBroads, ...tasteSpecific];
+    if (selectedWords.length === 0) {
+      alert('上の選択肢から味わいのキーワードを1つ以上選択してください。');
+      return;
+    }
+    setGeneratingTaste(true);
+    try {
+      const pastComments = await fetchUserRecentComments();
+      const generated = await generateTasteComment({
+        type: '味わいの印象',
+        selectedWords,
+        pastComments,
+      });
+      setTasteCustom(generated);
+    } catch (err: any) {
+      console.error(err);
+      alert(`コメント生成に失敗しました: ${err.message || 'エラーが発生しました'}`);
+    } finally {
+      setGeneratingTaste(false);
+    }
+  };
 
   useEffect(() => {
     if (questData) {
@@ -70,11 +173,13 @@ export default function NewReview() {
         rating,
         aroma: {
           broads: aromaBroads,
-          specific: aromaSpecific
+          specific: aromaSpecific,
+          ...(aromaCustom.trim() ? { custom: aromaCustom.trim() } : {})
         },
         taste: {
           broads: tasteBroads,
-          specific: tasteSpecific
+          specific: tasteSpecific,
+          ...(tasteCustom.trim() ? { custom: tasteCustom.trim() } : {})
         },
         temperature,
         vessel,
@@ -163,9 +268,54 @@ export default function NewReview() {
             </div>
           )}
           
+          <div className="pt-4 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-slate-700">
+                自由入力（その他感じた香りやニュアンス）
+              </label>
+              <button
+                type="button"
+                onClick={handleGenerateAromaAI}
+                disabled={generatingAroma || (aromaBroads.length === 0 && aromaSpecific.length === 0)}
+                className={clsx(
+                  "flex items-center space-x-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-all border shadow-xs",
+                  generatingAroma
+                    ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                    : (aromaBroads.length === 0 && aromaSpecific.length === 0)
+                      ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
+                      : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 active:scale-95 cursor-pointer"
+                )}
+                title="選択したワードと過去の投稿から50文字程度のコメントを作成します"
+              >
+                {generatingAroma ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1 text-indigo-600" />
+                    <span>生成中...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>AIサポート</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <textarea
+              rows={3}
+              value={aromaCustom}
+              onChange={(e) => setAromaCustom(e.target.value)}
+              placeholder="例：青リンゴの皮、マスカット、わずかなスモーキー感 など"
+              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 placeholder:text-slate-400 text-sm"
+              maxLength={100}
+            />
+            <p className="text-xs text-slate-400 mt-1.5 flex items-center">
+              💡 選択ワードと過去の投稿コメント（最新30件）を元にAIが約50文字で作成します
+            </p>
+          </div>
+          
           <div className="pt-6">
             <button
-              disabled={aromaBroads.length === 0}
+              disabled={aromaBroads.length === 0 && !aromaCustom.trim()}
               onClick={() => setStep(2)}
               className="w-full bg-slate-900 text-white py-4 rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
             >
@@ -217,6 +367,51 @@ export default function NewReview() {
               </div>
             </div>
           )}
+
+          <div className="pt-4 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-slate-700">
+                自由入力（その他感じた味わいやニュアンス）
+              </label>
+              <button
+                type="button"
+                onClick={handleGenerateTasteAI}
+                disabled={generatingTaste || (tasteBroads.length === 0 && tasteSpecific.length === 0)}
+                className={clsx(
+                  "flex items-center space-x-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-all border shadow-xs",
+                  generatingTaste
+                    ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                    : (tasteBroads.length === 0 && tasteSpecific.length === 0)
+                      ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
+                      : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 active:scale-95 cursor-pointer"
+                )}
+                title="選択したワードと過去の投稿から50文字程度のコメントを作成します"
+              >
+                {generatingTaste ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1 text-emerald-600" />
+                    <span>生成中...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>AIサポート</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <textarea
+              rows={3}
+              value={tasteCustom}
+              onChange={(e) => setTasteCustom(e.target.value)}
+              placeholder="例：レモンのような引き締まった酸、後味のやわらかな甘み など"
+              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 placeholder:text-slate-400 text-sm"
+              maxLength={100}
+            />
+            <p className="text-xs text-slate-400 mt-1.5 flex items-center">
+              💡 選択ワードと過去の投稿コメント（最新30件）を元にAIが約50文字で作成します
+            </p>
+          </div>
           
           <div className="pt-6 flex space-x-3">
             <button
@@ -226,7 +421,7 @@ export default function NewReview() {
               戻る
             </button>
             <button
-              disabled={tasteBroads.length === 0}
+              disabled={tasteBroads.length === 0 && !tasteCustom.trim()}
               onClick={() => setStep(3)}
               className="flex-1 bg-slate-900 text-white py-4 rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
             >
