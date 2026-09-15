@@ -14,6 +14,7 @@ import MyPage from './pages/MyPage';
 import SakeDetail from './pages/SakeDetail';
 import NewReview from './pages/NewReview';
 import NewSake from './pages/NewSake';
+import SettingsPage from './pages/Settings';
 
 function Navigation() {
   return (
@@ -87,6 +88,7 @@ export default function App() {
             <Route path="/explore" element={<ExplorePage />} />
             <Route path="/quests" element={<QuestPage />} />
             <Route path="/mypage" element={<MyPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="/sake/new" element={<NewSake />} />
             <Route path="/sake/:id" element={<SakeDetail />} />
             <Route path="/sake/:id/review" element={<NewReview />} />

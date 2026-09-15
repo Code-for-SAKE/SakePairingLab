@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Award, LogOut, Settings, TrendingUp, Loader2, PenTool, Check, X } from 'lucide-react';
+import { Award, Settings, TrendingUp, Loader2, PenTool, LogOut } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import clsx from 'clsx';
-import { setUserApiKey, getApiKey } from '../lib/gemini';
 import { Review } from '../types';
 import { Link } from 'react-router-dom';
 
@@ -19,62 +17,13 @@ const TASTE_CATEGORIES = [
 ];
 
 export default function MyPage() {
-  const { user, profile, logout, signInWithGoogle } = useAuth();
+  const { user, profile, signInWithGoogle, logout } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
-  const [inputKey, setInputKey] = useState('');
-  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [cleared, setCleared] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Save user-provided Gemini API key to secure storage
-  const handleSaveKey = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      setUserApiKey(inputKey.trim());
-      setSaved(true);
-      setInputKey('');
-      setHasApiKey(true);
-      // Clear saved message after a short while
-      setTimeout(() => setSaved(false), 3000);
-    } catch (e) {
-      console.error(e);
-      setError('APIキーの保存に失敗しました');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Clear user-provided Gemini API key from secure storage
-  const handleClearKey = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      setUserApiKey('');
-      setCleared(true);
-      setHasApiKey(false);
-      setInputKey('');
-      // Clear cleared message after a short while
-      setTimeout(() => setCleared(false), 3000);
-    } catch (e) {
-      console.error(e);
-      setError('APIキーのクリアに失敗しました');
-    } finally {
-      setSaving(false);
-    }
-  };
 
 
   useEffect(() => {
     let isMounted = true;
-    getApiKey().then(key => {
-      if (isMounted) {
-        setHasApiKey(key !== '');
-      }
-    });
     if (!user) {
       setReviews([]);
       return;
@@ -154,9 +103,9 @@ export default function MyPage() {
     <div className="max-w-xl mx-auto pt-6 px-4 pb-20">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-slate-900">マイページ</h1>
-        <button className="p-2 text-slate-400 hover:text-slate-900">
+        <Link to="/settings" className="p-2 text-slate-400 hover:text-slate-900">
           <Settings className="w-6 h-6" />
-        </button>
+        </Link>
       </div>
 
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6 text-center">
@@ -224,45 +173,6 @@ export default function MyPage() {
           </div>
         )}
       </div>
-
-      <div className="mt-6 mb-4">
-        <h3 className="font-bold text-slate-900 mb-2">Gemini APIキー設定</h3>
-        <input
-          type="password"
-          placeholder="APIキーを入力"
-          value={inputKey}
-          onChange={e => setInputKey(e.target.value)}
-          className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-shadow shadow-sm"
-        />
-        <button
-          onClick={handleSaveKey}
-          disabled={saving}
-          className={clsx(
-            "my-3 w-full flex items-center justify-center space-x-2 text-white bg-indigo-600 py-2 rounded-xl hover:bg-indigo-700 transition-colors",
-            saving && "opacity-50 cursor-not-allowed"
-          )}
-        >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : <Check className="w-4 h-4" />}
-          {saved ? "保存しました" : "保存"}
-        </button>
-        {error && <p className="text-red-500 mt-2">{error}</p>}
-
-        <span className="text-sm text-slate-500 text-center mt-2 leading-relaxed">{hasApiKey ? "APIキーが設定されています。" : "APIキーを入力してください。"}</span>
-        <button
-          hidden={!hasApiKey}
-          onClick={handleClearKey}
-          disabled={saving}
-          className={clsx(
-            "my-3 w-full flex items-center justify-center space-x-2 text-white bg-gray-600 py-2 rounded-xl hover:bg-gray-700 transition-colors",
-            saving && "opacity-50 cursor-not-allowed"
-          )}
-        >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : cleared ? <Check className="w-4 h-4" /> : <Check className="w-4 h-4" />}
-          {cleared ? "クリアしました" : "クリア"}
-        </button>
-
-      </div>
-
       <button
         onClick={logout}
         className="w-full flex items-center justify-center space-x-2 text-rose-500 bg-rose-50 py-4 rounded-xl font-medium hover:bg-rose-100 transition-colors"
