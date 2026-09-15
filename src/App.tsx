@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Home, Compass, Target, User } from 'lucide-react';
 import HomePage from './pages/Home';
@@ -17,24 +17,32 @@ import NewSake from './pages/NewSake';
 import SettingsPage from './pages/Settings';
 
 function Navigation() {
+  const location = useLocation();
+  const isActive = (path: string) =>
+    path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
+  const linkClass = (path: string) =>
+    `flex flex-col items-center justify-center w-full h-full transition-colors ${
+      isActive(path) ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
+    }`;
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 pb-safe z-50">
       <div className="flex justify-around items-center h-16">
-        <Link to="/" className="flex flex-col items-center justify-center w-full h-full text-slate-500 hover:text-indigo-600">
+        <Link to="/" className={linkClass('/')}>
           <Home className="w-6 h-6" />
-          <span className="text-xs mt-1">ホーム</span>
+          <span className="text-xs mt-1 font-medium">ホーム</span>
         </Link>
-        <Link to="/explore" className="flex flex-col items-center justify-center w-full h-full text-slate-500 hover:text-indigo-600">
+        <Link to="/explore" className={linkClass('/explore')}>
           <Compass className="w-6 h-6" />
-          <span className="text-xs mt-1">探す</span>
+          <span className="text-xs mt-1 font-medium">探す</span>
         </Link>
-        <Link to="/quests" className="flex flex-col items-center justify-center w-full h-full text-slate-500 hover:text-indigo-600">
+        <Link to="/quests" className={linkClass('/quests')}>
           <Target className="w-6 h-6" />
-          <span className="text-xs mt-1">クエスト</span>
+          <span className="text-xs mt-1 font-medium">クエスト</span>
         </Link>
-        <Link to="/mypage" className="flex flex-col items-center justify-center w-full h-full text-slate-500 hover:text-indigo-600">
+        <Link to="/mypage" className={linkClass('/mypage')}>
           <User className="w-6 h-6" />
-          <span className="text-xs mt-1">マイページ</span>
+          <span className="text-xs mt-1 font-medium">マイページ</span>
         </Link>
       </div>
     </nav>
