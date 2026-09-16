@@ -6,7 +6,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { Home, Compass, Target, User } from 'lucide-react';
+import { Home, FlaskRound, Compass, User } from 'lucide-react';
+import Header from './components/Header';
 import HomePage from './pages/Home';
 import ExplorePage from './pages/Explore';
 import QuestPage from './pages/Quest';
@@ -37,7 +38,7 @@ function Navigation() {
           <span className="text-xs mt-1 font-medium">探す</span>
         </Link>
         <Link to="/quests" className={linkClass('/quests')}>
-          <Target className="w-6 h-6" />
+          <FlaskRound className="w-6 h-6" />
           <span className="text-xs mt-1 font-medium">クエスト</span>
         </Link>
         <Link to="/mypage" className={linkClass('/mypage')}>
@@ -61,9 +62,9 @@ function MainLayout({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
         <div className="text-center max-w-md w-full bg-white rounded-2xl shadow-sm p-8 border border-slate-100">
           <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Compass className="w-8 h-8 text-indigo-600" />
+            <FlaskRound className="w-8 h-8 text-indigo-600" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">日本酒探求SNS</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">日本酒ペアリングラボ</h1>
           <p className="text-slate-500 mb-8 leading-relaxed">
             日本酒の美味しい飲み方をみんなで探求し、最高のペアリングを共有しましょう。
           </p>
@@ -80,6 +81,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
+      <Header />
       {children}
       <Navigation />
     </div>
