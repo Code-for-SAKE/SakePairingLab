@@ -3,21 +3,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Home, FlaskRound, Compass, User } from 'lucide-react';
 import Header from './components/Header';
-import HomePage from './pages/Home';
-import ExplorePage from './pages/Explore';
-import QuestPage from './pages/Quest';
-import MyPage from './pages/MyPage';
-import SakeDetail from './pages/SakeDetail';
-import NewReview from './pages/NewReview';
-import NewSake from './pages/NewSake';
-import NewQuest from './pages/NewQuest';
-import SettingsPage from './pages/Settings';
 
+const HomePage = lazy(() => import('./pages/Home'));
+const ExplorePage = lazy(() => import('./pages/Explore'));
+const QuestPage = lazy(() => import('./pages/Quest'));
+const MyPage = lazy(() => import('./pages/MyPage'));
+const SakeDetail = lazy(() => import('./pages/SakeDetail'));
+const NewReview = lazy(() => import('./pages/NewReview'));
+const NewSake = lazy(() => import('./pages/NewSake'));
+const NewQuest = lazy(() => import('./pages/NewQuest'));
+const SettingsPage = lazy(() => import('./pages/Settings'));
 
 function Navigation() {
   const location = useLocation();
@@ -95,17 +95,19 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <MainLayout>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/explore" element={<ExplorePage />} />
-            <Route path="/quests" element={<QuestPage />} />
-            <Route path="/quests/new" element={<NewQuest />} />
-            <Route path="/mypage" element={<MyPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/sake/new" element={<NewSake />} />
-            <Route path="/sake/:id" element={<SakeDetail />} />
-            <Route path="/sake/:id/review" element={<NewReview />} />
-          </Routes>
+          <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center text-slate-400 font-medium">読み込み中...</div>}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/explore" element={<ExplorePage />} />
+              <Route path="/quests" element={<QuestPage />} />
+              <Route path="/quests/new" element={<NewQuest />} />
+              <Route path="/mypage" element={<MyPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/sake/new" element={<NewSake />} />
+              <Route path="/sake/:id" element={<SakeDetail />} />
+              <Route path="/sake/:id/review" element={<NewReview />} />
+            </Routes>
+          </Suspense>
         </MainLayout>
       </BrowserRouter>
     </AuthProvider>
