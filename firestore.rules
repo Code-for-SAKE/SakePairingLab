@@ -75,6 +75,36 @@ service cloud.firestore {
         );
     }
 
+    function isValidQuest(data) {
+      return data.keys().hasAll(['title', 'status', 'rewardPoints', 'createdAt', 'createdBy'])
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 100
+        && data.status in ['open', 'completed']
+        && data.rewardPoints is number
+        && data.createdBy == request.auth.uid
+        && data.createdAt == request.time
+        && (
+          !('sakeId' in data.keys()) || (data.sakeId is string && isValidId(data.sakeId))
+        )
+        && (
+          !('sakeBrand' in data.keys()) || (data.sakeBrand is string && data.sakeBrand.size() <= 100)
+        )
+        && (
+          !('sakeBottle' in data.keys()) || (data.sakeBottle is string && data.sakeBottle.size() <= 100)
+        )
+        && (
+          !('description' in data.keys()) || (data.description is string && data.description.size() <= 1000)
+        )
+        && (
+          !('targetTemperature' in data.keys()) || (data.targetTemperature is string && data.targetTemperature.size() <= 50)
+        )
+        && (
+          !('targetVessel' in data.keys()) || (data.targetVessel is string && data.targetVessel.size() <= 100)
+        )
+        && (
+          !('targetPairing' in data.keys()) || (data.targetPairing is string && data.targetPairing.size() <= 200)
+        );
+    }
+
     // --- Match Blocks ---
 
     match /users/{userId} {
@@ -129,5 +159,12 @@ service cloud.firestore {
       allow delete: if isSignedIn() && isValidId(reviewId) && existing().userId == request.auth.uid;
     }
 
+    match /quests/{questId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && isValidId(questId) && isValidQuest(incoming());
+    }
+
   }
 }
+

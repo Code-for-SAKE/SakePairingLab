@@ -64,6 +64,26 @@
         "questId": { "type": "string", "maxLength": 128 }
       },
       "required": ["sakeId", "userId", "aroma", "taste", "temperature", "vessel", "pairing", "createdAt", "likesCount"]
+    },
+    "Quest": {
+      "title": "Quest",
+      "description": "Pairing challenge quest definition",
+      "type": "object",
+      "properties": {
+        "sakeId": { "type": "string", "maxLength": 128 },
+        "sakeBrand": { "type": "string", "maxLength": 100 },
+        "sakeBottle": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "targetTemperature": { "type": "string", "maxLength": 50 },
+        "targetVessel": { "type": "string", "maxLength": 100 },
+        "targetPairing": { "type": "string", "maxLength": 200 },
+        "status": { "type": "string", "enum": ["open", "completed"] },
+        "rewardPoints": { "type": "number" },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "status", "rewardPoints", "createdBy", "createdAt"]
     }
   },
   "firestore": {
@@ -78,6 +98,11 @@
     "/reviews/{reviewId}": {
       "schema": { "$ref": "#/entities/Review" },
       "description": "Stores user reviews of sakes"
+    },
+    "/quests/{questId}": {
+      "schema": { "$ref": "#/entities/Quest" },
+      "description": "Stores pairing challenge quests"
     }
   }
 }
+

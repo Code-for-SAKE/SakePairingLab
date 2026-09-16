@@ -43,12 +43,18 @@ export type Review = {
 
 export type Quest = {
   id: string;
-  sakeId: string;
+  sakeId?: string;
+  sakeBrand?: string;
+  sakeBottle?: string;
   title: string;
-  description: string;
+  description?: string;
   targetTemperature?: string;
   targetVessel?: string;
   targetPairing?: string;
   status: 'open' | 'completed';
   rewardPoints: number;
+  createdBy?: string;
+  createdAt?: any;
 };
+
+
