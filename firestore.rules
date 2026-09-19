@@ -113,7 +113,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming());
       allow update: if isSignedIn() && isValidId(userId) && userId == request.auth.uid 
                     && incoming().id == existing().id // Immutable
-                    && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'title', 'contributionScore', 'tastePreferences'])
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'title', 'contributionScore', 'tastePreferences', 'role'])
                     && (
                       !('displayName' in incoming().keys()) || (incoming().displayName is string && incoming().displayName.size() <= 50)
                     )
@@ -128,6 +128,9 @@ service cloud.firestore {
                     )
                     && (
                       !('tastePreferences' in incoming().keys()) || incoming().tastePreferences is map
+                    )
+                    && (
+                      !('role' in incoming().keys()) || incoming().role is string
                     );
     }
 

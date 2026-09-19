@@ -36,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             photoURL: firebaseUser.photoURL || '',
             title: '見習いテイスター',
             contributionScore: 0,
+            role: 'user',
           };
           await setDoc(userRef, newProfile);
           setProfile(newProfile);

@@ -5,6 +5,7 @@ export type UserProfile = {
   title: string;
   contributionScore: number;
   tastePreferences?: any;
+  role: 'user' | 'admin';
 };
 
 export type Sake = {

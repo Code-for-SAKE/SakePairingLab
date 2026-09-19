@@ -10,7 +10,8 @@
         "photoURL": { "type": "string", "maxLength": 500 },
         "title": { "type": "string", "maxLength": 50 },
         "contributionScore": { "type": "number" },
-        "tastePreferences": { "type": "object" }
+        "tastePreferences": { "type": "object" },
+        "role": { "type": "string", "enum": ["user", "admin"] }
       },
       "required": ["id", "displayName", "title", "contributionScore"]
     },
