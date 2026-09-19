@@ -2,10 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Award, Settings, TrendingUp, Loader2, PenTool, LogOut } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { Review } from '../types';
+import { where, orderBy } from 'firebase/firestore';
+import { Review, UserProfile } from '../types';
 import { Link } from 'react-router-dom';
+import FirestorePager from '../lib/firestorepager';
+import { enrichReviews } from '../lib/review';
+import { ReviewCard }from '../components/ReviewCard';
+import LoadMoreTrigger from '../components/LoadMoreTrigger';
 
 const TASTE_CATEGORIES = [
   'フルーティ',
@@ -16,10 +19,17 @@ const TASTE_CATEGORIES = [
   '甘味',
 ];
 
+interface ReviewWithUser extends Review {
+  user?: UserProfile;
+}
+
+const pager = new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5);
+
 export default function MyPage() {
   const { user, profile, signInWithGoogle, logout } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
 
   useEffect(() => {
@@ -29,14 +39,15 @@ export default function MyPage() {
       return;
     }
 
+    pager.addQuery(where('userId', '==', user.uid));
+
     const fetchMyReviews = async () => {
       setLoading(true);
       try {
-        const q = query(collection(db, 'reviews'), where('userId', '==', user.uid));
-        const snap = await getDocs(q);
-        const myReviews = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review));
+        const myReviews = await pager.loadFirst();
+        const enrichedReviews = await enrichReviews(myReviews);
         if (isMounted) {
-          setReviews(myReviews);
+          setReviews(enrichedReviews);
         }
       } catch (err) {
         console.error('Error fetching user reviews:', err);
@@ -53,6 +64,15 @@ export default function MyPage() {
       isMounted = false;
     };
   }, [user]);
+
+  const handleLoadMore = async () => {
+    setLoadingMore(true);
+    const review = await pager.loadNext() as ReviewWithUser[] | null;
+    const enrichedReviews = await enrichReviews(review);
+    setReviews(prev => [...prev, ...enrichedReviews]);
+    setLoadingMore(false);
+  };
+
 
   // Compute dynamic taste preferences from actual reviews
   const tasteCounts: { [key: string]: number } = {};
@@ -103,9 +123,19 @@ export default function MyPage() {
     <div className="max-w-xl mx-auto pt-6 px-4 pb-20">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-slate-900">マイページ</h1>
+        <div className="flex items-center space-x-4">
         <Link to="/settings" className="p-2 text-slate-400 hover:text-slate-900">
           <Settings className="w-6 h-6" />
         </Link>
+              <button
+        onClick={logout}
+        className="p-3 flex items-center justify-center space-x-2 text-rose-500 bg-rose-50 py-4 rounded-xl font-medium hover:bg-rose-100 transition-colors"
+      >
+        <LogOut className="w-5 h-5" />
+        <span>ログアウト</span>
+      </button>
+      </div>
+
       </div>
 
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6 text-center">
@@ -121,7 +151,7 @@ export default function MyPage() {
           <Award className="w-4 h-4 mr-1" />
           {profile?.title || '見習いテイスター'}
         </div>
-        
+
         <div className="flex justify-center space-x-8 text-sm">
           <div className="text-center">
             <p className="text-slate-500 mb-1">貢献度</p>
@@ -139,7 +169,7 @@ export default function MyPage() {
           <TrendingUp className="w-5 h-5 mr-2 text-indigo-500" />
           あなたの好みの傾向
         </h3>
-        
+
         {loading ? (
           <div className="py-12 flex justify-center text-indigo-600">
             <Loader2 className="w-6 h-6 animate-spin" />
@@ -173,13 +203,24 @@ export default function MyPage() {
           </div>
         )}
       </div>
-      <button
-        onClick={logout}
-        className="w-full flex items-center justify-center space-x-2 text-rose-500 bg-rose-50 py-4 rounded-xl font-medium hover:bg-rose-100 transition-colors"
-      >
-        <LogOut className="w-5 h-5" />
-        <span>ログアウト</span>
-      </button>
+      <div className="h-4">
+        {reviews.length === 0 ? (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 text-center text-slate-500 py-12">
+            まだレビューがありません。最初のレビューを書きましょう！
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {reviews.map((review) => (
+              <ReviewCard key={review.id} review={review} />
+            ))}
+            <LoadMoreTrigger
+              onLoadMore={handleLoadMore}
+              hasMore={pager.isLastPage === false}
+              loading={loadingMore}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

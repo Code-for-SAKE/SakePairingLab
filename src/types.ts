@@ -58,4 +58,6 @@ export type Quest = {
   createdAt?: any;
 };
 
-
+export interface ReviewWithUser extends Review {
+  user?: UserProfile;
+}
