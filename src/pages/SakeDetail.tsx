@@ -9,7 +9,6 @@ import FirestorePager from '../lib/firestorepager';
 import { enrichReviews } from '../lib/review';
 import { ReviewCard } from '../components/ReviewCard';
 
-
 export default function SakeDetail() {
   const { id } = useParams<{ id: string }>();
   const [sake, setSake] = useState<Sake | null>(null);
@@ -17,7 +16,10 @@ export default function SakeDetail() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pager = useMemo(() => new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5), [id]);
+  const pager = useMemo(
+    () => new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5),
+    [id],
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -76,7 +78,7 @@ export default function SakeDetail() {
     setLoadingMore(true);
     const review = await pager.loadNext();
     const enrichedReviews = await enrichReviews(review);
-    setReviews(prev => [...prev, ...enrichedReviews]);
+    setReviews((prev) => [...prev, ...enrichedReviews]);
     setLoadingMore(false);
   };
 
@@ -92,7 +94,10 @@ export default function SakeDetail() {
   if (error || !sake) {
     return (
       <div className="max-w-xl mx-auto pt-6 px-4">
-        <Link to="/explore" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 mb-6">
+        <Link
+          to="/explore"
+          className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 mb-6"
+        >
           <ChevronLeft className="w-4 h-4 mr-1" />
           一覧に戻る
         </Link>
@@ -105,11 +110,14 @@ export default function SakeDetail() {
 
   return (
     <div className="max-w-xl mx-auto pt-6 px-4 pb-20">
-      <Link to="/explore" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 mb-6">
+      <Link
+        to="/explore"
+        className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 mb-6"
+      >
         <ChevronLeft className="w-4 h-4 mr-1" />
         戻る
       </Link>
-      
+
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 text-center">
         <p className="text-sm font-medium text-slate-500 mb-2">{sake.brewery}</p>
         <h1 className="text-3xl font-bold text-slate-900 mb-2">{sake.brand}</h1>
@@ -119,7 +127,7 @@ export default function SakeDetail() {
 
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold text-lg text-slate-900">みんなのテイスティング</h3>
-        <Link 
+        <Link
           to={`/sake/${id}/review`}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center shadow-sm hover:bg-indigo-700 transition-colors"
         >

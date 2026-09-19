@@ -10,8 +10,14 @@ import FirestorePager from '../lib/firestorepager';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 export default function QuestPage() {
-  const pager = useMemo(() => new FirestorePager<Quest>('quests', orderBy('createdAt', 'desc'), 5), []);
-  const sakePager = useMemo(() => new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 5), []);
+  const pager = useMemo(
+    () => new FirestorePager<Quest>('quests', orderBy('createdAt', 'desc'), 5),
+    [],
+  );
+  const sakePager = useMemo(
+    () => new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 5),
+    [],
+  );
   const navigate = useNavigate();
   const { profile } = useAuth();
   const [quests, setQuests] = useState<Quest[]>([]);
@@ -30,7 +36,7 @@ export default function QuestPage() {
     const fetchQuests = async () => {
       try {
         setLoading(true);
-        const list = await pager.loadFirst() || [];
+        const list = (await pager.loadFirst()) || [];
 
         if (isMounted) {
           setQuests(list);
@@ -51,7 +57,6 @@ export default function QuestPage() {
     };
   }, []);
 
-
   // Perform AI Vector Search when query changes (with debounce)
   useEffect(() => {
     const trimmed = sakeSearchQuery.trim();
@@ -61,7 +66,6 @@ export default function QuestPage() {
 
     let isMounted = true;
     const timer = setTimeout(async () => {
-
       try {
         // Try Cloud Function vector search first
         const functions = getFunctions(app);
@@ -76,7 +80,10 @@ export default function QuestPage() {
           return;
         }
       } catch (cfErr) {
-        console.warn('Cloud Functions vector search unavailable, attempting client fallback...', cfErr);
+        console.warn(
+          'Cloud Functions vector search unavailable, attempting client fallback...',
+          cfErr,
+        );
       }
     }, 2000);
 
@@ -95,7 +102,7 @@ export default function QuestPage() {
           targetTemperature: quest.targetTemperature,
           targetPairing: quest.targetPairing,
           targetVessel: quest.targetVessel,
-        }
+        },
       });
     } else {
       // 日本酒が固定されていない場合、モーダルを開いて日本酒をロード
@@ -125,21 +132,22 @@ export default function QuestPage() {
         targetTemperature: quest.targetTemperature,
         targetPairing: quest.targetPairing,
         targetVessel: quest.targetVessel,
-      }
+      },
     });
   };
 
-  const filteredSakes = sakes.filter(s => 
-    s.brand.toLowerCase().includes(sakeSearchQuery.toLowerCase()) ||
-    s.brewery.toLowerCase().includes(sakeSearchQuery.toLowerCase()) ||
-    s.bottle.toLowerCase().includes(sakeSearchQuery.toLowerCase())
+  const filteredSakes = sakes.filter(
+    (s) =>
+      s.brand.toLowerCase().includes(sakeSearchQuery.toLowerCase()) ||
+      s.brewery.toLowerCase().includes(sakeSearchQuery.toLowerCase()) ||
+      s.bottle.toLowerCase().includes(sakeSearchQuery.toLowerCase()),
   );
 
   const handleLoadMore = async () => {
     setLoadingMore(true);
     const list = await pager.loadNext();
     if (list) {
-      setQuests(prev => [...prev, ...list]);
+      setQuests((prev) => [...prev, ...list]);
     }
     setLoadingMore(false);
   };
@@ -180,7 +188,9 @@ export default function QuestPage() {
             <Target className="w-6 h-6 text-indigo-600" />
           </div>
           <p className="text-slate-900 font-bold mb-1">登録されているクエストがまだありません</p>
-          <p className="text-slate-500 text-sm mb-6">最初のペアリングクエストを作成して、みんなで美味しい飲み方を探求しましょう！</p>
+          <p className="text-slate-500 text-sm mb-6">
+            最初のペアリングクエストを作成して、みんなで美味しい飲み方を探求しましょう！
+          </p>
           <Link
             to="/quests/new"
             className="inline-flex items-center px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"
@@ -192,9 +202,12 @@ export default function QuestPage() {
       ) : (
         <div className="space-y-4">
           {quests.map((quest) => (
-            <div key={quest.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 relative overflow-hidden">
+            <div
+              key={quest.id}
+              className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 relative overflow-hidden"
+            >
               <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500"></div>
-              
+
               <div className="flex justify-between items-start mb-2">
                 <h3 className="font-bold text-lg text-slate-900 pr-2">{quest.title}</h3>
                 <div className="flex items-center text-amber-600 font-bold text-xs bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg shrink-0">
@@ -202,24 +215,33 @@ export default function QuestPage() {
                   {quest.rewardPoints} pt
                 </div>
               </div>
-              
+
               <p className="text-sm font-medium text-indigo-600 mb-2">
-                対象: {quest.sakeBrand ? `${quest.sakeBrand} ${quest.sakeBottle}` : '指定なし (どの日本酒でもOK)'}
+                対象:{' '}
+                {quest.sakeBrand
+                  ? `${quest.sakeBrand} ${quest.sakeBottle}`
+                  : '指定なし (どの日本酒でもOK)'}
               </p>
-              
+
               {quest.description && (
                 <p className="text-slate-600 text-sm mb-4 leading-relaxed">{quest.description}</p>
               )}
-              
+
               <div className="flex flex-wrap gap-2 mb-4">
                 {quest.targetPairing && (
-                  <span className="text-xs bg-rose-50 text-rose-700 border border-rose-100 px-2.5 py-1 rounded-md font-medium">指定おつまみ: {quest.targetPairing}</span>
+                  <span className="text-xs bg-rose-50 text-rose-700 border border-rose-100 px-2.5 py-1 rounded-md font-medium">
+                    指定おつまみ: {quest.targetPairing}
+                  </span>
                 )}
                 {quest.targetTemperature && (
-                  <span className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-medium">指定温度: {quest.targetTemperature}</span>
+                  <span className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-medium">
+                    指定温度: {quest.targetTemperature}
+                  </span>
                 )}
                 {quest.targetVessel && (
-                  <span className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-medium">指定酒器: {quest.targetVessel}</span>
+                  <span className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-medium">
+                    指定酒器: {quest.targetVessel}
+                  </span>
                 )}
               </div>
 
@@ -258,7 +280,9 @@ export default function QuestPage() {
             </div>
 
             <p className="text-xs text-slate-500 mb-4">
-              クエスト: <span className="font-bold text-slate-800">「{activeQuestForSelect.title}」</span><br />
+              クエスト:{' '}
+              <span className="font-bold text-slate-800">「{activeQuestForSelect.title}」</span>
+              <br />
               どの日本酒で挑戦するか選択してください。
             </p>
 
@@ -299,10 +323,15 @@ export default function QuestPage() {
                     className="w-full text-left p-3 rounded-xl border border-slate-100 hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors flex items-center justify-between"
                   >
                     <div>
-                      <p className="font-bold text-slate-900 text-sm">{sake.brand} <span className="text-xs font-normal text-slate-500">{sake.bottle}</span></p>
+                      <p className="font-bold text-slate-900 text-sm">
+                        {sake.brand}{' '}
+                        <span className="text-xs font-normal text-slate-500">{sake.bottle}</span>
+                      </p>
                       <p className="text-xs text-slate-400">{sake.brewery}</p>
                     </div>
-                    <span className="text-xs bg-indigo-600 text-white font-medium px-3 py-1 rounded-lg">この酒で挑戦</span>
+                    <span className="text-xs bg-indigo-600 text-white font-medium px-3 py-1 rounded-lg">
+                      この酒で挑戦
+                    </span>
                   </button>
                 ))
               )}

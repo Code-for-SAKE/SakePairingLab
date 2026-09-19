@@ -1,23 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Award, Settings, TrendingUp, Loader2, PenTool, LogOut } from 'lucide-react';
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
+import {
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ResponsiveContainer,
+} from 'recharts';
 import { where, orderBy } from 'firebase/firestore';
 import { Review, UserProfile } from '../types';
 import { Link } from 'react-router-dom';
 import FirestorePager from '../lib/firestorepager';
 import { enrichReviews } from '../lib/review';
-import { ReviewCard }from '../components/ReviewCard';
+import { ReviewCard } from '../components/ReviewCard';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
 
-const TASTE_CATEGORIES = [
-  'フルーティ',
-  'スッキリ・軽快',
-  '熟成',
-  'ふくよか・旨味',
-  '酸味',
-  '甘味',
-];
+const TASTE_CATEGORIES = ['フルーティ', 'スッキリ・軽快', '熟成', 'ふくよか・旨味', '酸味', '甘味'];
 
 interface ReviewWithUser extends Review {
   user?: UserProfile;
@@ -25,11 +25,13 @@ interface ReviewWithUser extends Review {
 
 export default function MyPage() {
   const { user, profile, signInWithGoogle, logout } = useAuth();
-  const pager = useMemo(() => new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5), [user?.uid]);
+  const pager = useMemo(
+    () => new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5),
+    [user?.uid],
+  );
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-
 
   useEffect(() => {
     let isMounted = true;
@@ -66,36 +68,39 @@ export default function MyPage() {
 
   const handleLoadMore = async () => {
     setLoadingMore(true);
-    const review = await pager.loadNext() as ReviewWithUser[] | null;
+    const review = (await pager.loadNext()) as ReviewWithUser[] | null;
     const enrichedReviews = await enrichReviews(review);
-    setReviews(prev => [...prev, ...enrichedReviews]);
+    setReviews((prev) => [...prev, ...enrichedReviews]);
     setLoadingMore(false);
   };
 
-
   // Compute dynamic taste preferences from actual reviews
   const tasteCounts: { [key: string]: number } = {};
-  TASTE_CATEGORIES.forEach(cat => (tasteCounts[cat] = 0));
+  TASTE_CATEGORIES.forEach((cat) => (tasteCounts[cat] = 0));
 
-  reviews.forEach(r => {
+  reviews.forEach((r) => {
     // Check aroma
-    r.aroma?.broads?.forEach(b => {
-      if (b === 'スッキリ') tasteCounts['スッキリ・軽快'] = (tasteCounts['スッキリ・軽快'] || 0) + 1;
-      else if (b === 'ふくよか') tasteCounts['ふくよか・旨味'] = (tasteCounts['ふくよか・旨味'] || 0) + 1;
+    r.aroma?.broads?.forEach((b) => {
+      if (b === 'スッキリ')
+        tasteCounts['スッキリ・軽快'] = (tasteCounts['スッキリ・軽快'] || 0) + 1;
+      else if (b === 'ふくよか')
+        tasteCounts['ふくよか・旨味'] = (tasteCounts['ふくよか・旨味'] || 0) + 1;
       else if (tasteCounts[b] !== undefined) tasteCounts[b] += 1;
       else tasteCounts[b] = (tasteCounts[b] || 0) + 1;
     });
     // Check taste
-    r.taste?.broads?.forEach(b => {
-      if (b === 'スッキリ') tasteCounts['スッキリ・軽快'] = (tasteCounts['スッキリ・軽快'] || 0) + 1;
-      else if (b === 'ふくよか') tasteCounts['ふくよか・旨味'] = (tasteCounts['ふくよか・旨味'] || 0) + 1;
+    r.taste?.broads?.forEach((b) => {
+      if (b === 'スッキリ')
+        tasteCounts['スッキリ・軽快'] = (tasteCounts['スッキリ・軽快'] || 0) + 1;
+      else if (b === 'ふくよか')
+        tasteCounts['ふくよか・旨味'] = (tasteCounts['ふくよか・旨味'] || 0) + 1;
       else if (tasteCounts[b] !== undefined) tasteCounts[b] += 1;
       else tasteCounts[b] = (tasteCounts[b] || 0) + 1;
     });
   });
 
   const maxCount = Math.max(...Object.values(tasteCounts), 1);
-  const chartData = TASTE_CATEGORIES.map(cat => ({
+  const chartData = TASTE_CATEGORIES.map((cat) => ({
     subject: cat,
     A: Math.round(((tasteCounts[cat] || 0) / maxCount) * 100),
     fullMark: 100,
@@ -106,7 +111,9 @@ export default function MyPage() {
       <div className="max-w-xl mx-auto pt-16 px-4 text-center">
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
           <h2 className="text-xl font-bold text-slate-900 mb-2">ログインしていません</h2>
-          <p className="text-slate-500 text-sm mb-6">ログインするとテイスティング記録や好みの分析を確認できます。</p>
+          <p className="text-slate-500 text-sm mb-6">
+            ログインするとテイスティング記録や好みの分析を確認できます。
+          </p>
           <button
             onClick={signInWithGoogle}
             className="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium hover:bg-indigo-700 transition-colors shadow-sm"
@@ -123,18 +130,17 @@ export default function MyPage() {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-slate-900">マイページ</h1>
         <div className="flex items-center space-x-4">
-        <Link to="/settings" className="p-2 text-slate-400 hover:text-slate-900">
-          <Settings className="w-6 h-6" />
-        </Link>
-              <button
-        onClick={logout}
-        className="p-3 flex items-center justify-center space-x-2 text-rose-500 bg-rose-50 py-4 rounded-xl font-medium hover:bg-rose-100 transition-colors"
-      >
-        <LogOut className="w-5 h-5" />
-        <span>ログアウト</span>
-      </button>
-      </div>
-
+          <Link to="/settings" className="p-2 text-slate-400 hover:text-slate-900">
+            <Settings className="w-6 h-6" />
+          </Link>
+          <button
+            onClick={logout}
+            className="p-3 flex items-center justify-center space-x-2 text-rose-500 bg-rose-50 py-4 rounded-xl font-medium hover:bg-rose-100 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>ログアウト</span>
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6 text-center">
@@ -142,10 +148,14 @@ export default function MyPage() {
           {user?.photoURL ? (
             <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
           ) : (
-            <span className="text-2xl font-bold text-indigo-700">{profile?.displayName?.[0] || '名'}</span>
+            <span className="text-2xl font-bold text-indigo-700">
+              {profile?.displayName?.[0] || '名'}
+            </span>
           )}
         </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-1">{profile?.displayName || 'ユーザー'}</h2>
+        <h2 className="text-xl font-bold text-slate-900 mb-1">
+          {profile?.displayName || 'ユーザー'}
+        </h2>
         <div className="flex items-center justify-center text-amber-600 font-medium text-sm mb-4">
           <Award className="w-4 h-4 mr-1" />
           {profile?.title || '見習いテイスター'}
@@ -175,7 +185,11 @@ export default function MyPage() {
           </div>
         ) : reviews.length === 0 ? (
           <div className="text-center py-8 text-slate-400">
-            <p className="text-sm mb-4">まだレビューがありません。<br />記録を投稿するとあなたの好みの傾向がここにグラフで表示されます。</p>
+            <p className="text-sm mb-4">
+              まだレビューがありません。
+              <br />
+              記録を投稿するとあなたの好みの傾向がここにグラフで表示されます。
+            </p>
             <Link
               to="/explore"
               className="inline-flex items-center text-xs text-indigo-600 font-medium hover:underline"
@@ -192,7 +206,13 @@ export default function MyPage() {
                   <PolarGrid stroke="#e2e8f0" />
                   <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 11 }} />
                   <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                  <Radar name="Taste" dataKey="A" stroke="#6366f1" fill="#818cf8" fillOpacity={0.5} />
+                  <Radar
+                    name="Taste"
+                    dataKey="A"
+                    stroke="#6366f1"
+                    fill="#818cf8"
+                    fillOpacity={0.5}
+                  />
                 </RadarChart>
               </ResponsiveContainer>
             </div>

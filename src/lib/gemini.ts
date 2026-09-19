@@ -62,13 +62,12 @@ export async function generateTasteComment({
 
   const ai = new GoogleGenAI({ apiKey });
 
-  const pastCommentsText = pastComments.length > 0
-    ? pastComments.map((c, i) => `${i + 1}. ${c}`).join('\n')
-    : '（過去の投稿履歴なし）';
+  const pastCommentsText =
+    pastComments.length > 0
+      ? pastComments.map((c, i) => `${i + 1}. ${c}`).join('\n')
+      : '（過去の投稿履歴なし）';
 
-  const selectedWordsText = selectedWords.length > 0
-    ? selectedWords.join('、')
-    : '（未選択）';
+  const selectedWordsText = selectedWords.length > 0 ? selectedWords.join('、') : '（未選択）';
 
   const prompt = `
 あなたは日本酒のテイスティングレビュー作成を支援するAIアシスタントです。
@@ -116,4 +115,3 @@ export async function generateQueryEmbedding(text: string): Promise<number[]> {
 
   return values;
 }
-

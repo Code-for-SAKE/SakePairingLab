@@ -64,7 +64,17 @@
         "likesCount": { "type": "number" },
         "questId": { "type": "string", "maxLength": 128 }
       },
-      "required": ["sakeId", "userId", "aroma", "taste", "temperature", "vessel", "pairing", "createdAt", "likesCount"]
+      "required": [
+        "sakeId",
+        "userId",
+        "aroma",
+        "taste",
+        "temperature",
+        "vessel",
+        "pairing",
+        "createdAt",
+        "likesCount"
+      ]
     },
     "Quest": {
       "title": "Quest",
@@ -106,4 +116,3 @@
     }
   }
 }
-

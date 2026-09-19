@@ -1,7 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Check, Frown, Smile, Sparkles, Lock, Loader2 } from 'lucide-react';
-import { collection, addDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  Frown,
+  Smile,
+  Sparkles,
+  Lock,
+  Loader2,
+} from 'lucide-react';
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+} from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Review } from '../types';
@@ -9,19 +27,19 @@ import { generateTasteComment } from '../lib/gemini';
 import clsx from 'clsx';
 
 const AROMA_TREE = {
-  'フルーティ': ['リンゴ', '洋梨', 'メロン', 'バナナ', '白桃', 'マスカット', 'ライチ'],
-  'フローラル': ['白木蓮', '菩提樹', 'バラ', 'アカシア'],
+  フルーティ: ['リンゴ', '洋梨', 'メロン', 'バナナ', '白桃', 'マスカット', 'ライチ'],
+  フローラル: ['白木蓮', '菩提樹', 'バラ', 'アカシア'],
   'ハーブ・スパイス': ['ミント', '杉', 'ヒノキ', 'シナモン', 'クローブ'],
   '穀物・乳製品': ['炊きたてのご飯', 'つきたての餅', 'ヨーグルト', 'バター', 'チーズ'],
-  '熟成': ['ハチミツ', 'カラメル', 'ドライフルーツ', 'ナッツ', '醤油']
+  熟成: ['ハチミツ', 'カラメル', 'ドライフルーツ', 'ナッツ', '醤油'],
 };
 
 const TASTE_TREE = {
   'スッキリ・軽快': ['キレが良い', 'みずみずしい', '淡麗', 'シャープ'],
   'ふくよか・旨味': ['米の旨味', 'まろやか', 'ジューシー', 'ふっくら'],
-  '甘味': ['優しい甘み', '和三盆', '濃醇な甘み'],
-  '酸味': ['爽やかな酸', '乳酸', 'シャープな酸'],
-  '苦味・渋味': ['心地よい苦味', '複雑味', '余韻が長い']
+  甘味: ['優しい甘み', '和三盆', '濃醇な甘み'],
+  酸味: ['爽やかな酸', '乳酸', 'シャープな酸'],
+  '苦味・渋味': ['心地よい苦味', '複雑味', '余韻が長い'],
 };
 
 export default function NewReview() {
@@ -30,20 +48,20 @@ export default function NewReview() {
   const { user } = useAuth();
   const location = useLocation();
   const [loading, setLoading] = useState(false);
-  const questData = location.state as { 
-    questId?: string, 
-    targetTemperature?: string, 
-    targetPairing?: string, 
-    targetVessel?: string 
+  const questData = location.state as {
+    questId?: string;
+    targetTemperature?: string;
+    targetPairing?: string;
+    targetVessel?: string;
   } | null;
 
   const [step, setStep] = useState(1); // 1: Aroma, 2: Taste, 3: Pairing & Post
-  
+
   const [aromaBroads, setAromaBroads] = useState<string[]>([]);
   const [aromaSpecific, setAromaSpecific] = useState<string[]>([]);
   const [aromaCustom, setAromaCustom] = useState('');
   const [generatingAroma, setGeneratingAroma] = useState(false);
-  
+
   const [tasteBroads, setTasteBroads] = useState<string[]>([]);
   const [tasteSpecific, setTasteSpecific] = useState<string[]>([]);
   const [tasteCustom, setTasteCustom] = useState('');
@@ -63,11 +81,11 @@ export default function NewReview() {
         collection(db, 'reviews'),
         where('userId', '==', user.uid),
         orderBy('createdAt', 'desc'),
-        limit(30)
+        limit(30),
       );
       const snap = await getDocs(q);
       const pastComments: string[] = [];
-      snap.docs.forEach(doc => {
+      snap.docs.forEach((doc) => {
         const data = doc.data() as Review;
         if (data.comment && data.comment.trim()) {
           pastComments.push(data.comment.trim());
@@ -75,18 +93,26 @@ export default function NewReview() {
       });
       return pastComments;
     } catch (err: any) {
-      console.warn('Firestore query with orderBy failed (composite index might be building), falling back to client sort:', err);
+      console.warn(
+        'Firestore query with orderBy failed (composite index might be building), falling back to client sort:',
+        err,
+      );
       // インデックス未作成・構築中の場合の安全なフォールバック
       try {
-        const fallbackQuery = query(
-          collection(db, 'reviews'),
-          where('userId', '==', user.uid)
-        );
+        const fallbackQuery = query(collection(db, 'reviews'), where('userId', '==', user.uid));
         const snap = await getDocs(fallbackQuery);
-        const userReviews = snap.docs.map(doc => doc.data() as Review);
+        const userReviews = snap.docs.map((doc) => doc.data() as Review);
         userReviews.sort((a, b) => {
-          const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-          const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+          const timeA = a.createdAt?.toMillis
+            ? a.createdAt.toMillis()
+            : a.createdAt
+              ? new Date(a.createdAt).getTime()
+              : 0;
+          const timeB = b.createdAt?.toMillis
+            ? b.createdAt.toMillis()
+            : b.createdAt
+              ? new Date(b.createdAt).getTime()
+              : 0;
           return timeB - timeA;
         });
 
@@ -174,12 +200,12 @@ export default function NewReview() {
         aroma: {
           broads: aromaBroads,
           specific: aromaSpecific,
-          ...(aromaCustom.trim() ? { custom: aromaCustom.trim() } : {})
+          ...(aromaCustom.trim() ? { custom: aromaCustom.trim() } : {}),
         },
         taste: {
           broads: tasteBroads,
           specific: tasteSpecific,
-          ...(tasteCustom.trim() ? { custom: tasteCustom.trim() } : {})
+          ...(tasteCustom.trim() ? { custom: tasteCustom.trim() } : {}),
         },
         temperature,
         vessel,
@@ -187,11 +213,11 @@ export default function NewReview() {
         comment,
         createdAt: serverTimestamp(),
         likesCount: 0,
-        ...(questData?.questId ? { questId: questData.questId } : {})
+        ...(questData?.questId ? { questId: questData.questId } : {}),
       });
       navigate('/');
     } catch (e: any) {
-      console.error("Firestore Add Error:", e);
+      console.error('Firestore Add Error:', e);
       alert(`エラーが発生しました: ${e.message}`);
     } finally {
       setLoading(false);
@@ -200,7 +226,7 @@ export default function NewReview() {
 
   const toggleSpecific = (val: string, current: string[], setter: any) => {
     if (current.includes(val)) {
-      setter(current.filter(c => c !== val));
+      setter(current.filter((c) => c !== val));
     } else {
       setter([...current, val]);
     }
@@ -209,7 +235,10 @@ export default function NewReview() {
   return (
     <div className="max-w-xl mx-auto pt-6 px-4 pb-20">
       <div className="flex items-center mb-6">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-500 hover:text-slate-900">
+        <button
+          onClick={() => navigate(-1)}
+          className="p-2 -ml-2 text-slate-500 hover:text-slate-900"
+        >
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 text-center font-bold text-slate-900">
@@ -220,8 +249,14 @@ export default function NewReview() {
 
       {/* Progress */}
       <div className="flex space-x-2 mb-8">
-        {[1, 2, 3].map(s => (
-          <div key={s} className={clsx("h-1 flex-1 rounded-full", s <= step ? "bg-indigo-600" : "bg-slate-200")} />
+        {[1, 2, 3].map((s) => (
+          <div
+            key={s}
+            className={clsx(
+              'h-1 flex-1 rounded-full',
+              s <= step ? 'bg-indigo-600' : 'bg-slate-200',
+            )}
+          />
         ))}
       </div>
 
@@ -229,13 +264,15 @@ export default function NewReview() {
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
           <h2 className="text-xl font-bold text-slate-900">香りの印象は？</h2>
           <div className="grid grid-cols-2 gap-3">
-            {Object.keys(AROMA_TREE).map(broad => (
+            {Object.keys(AROMA_TREE).map((broad) => (
               <button
                 key={broad}
                 onClick={() => toggleSpecific(broad, aromaBroads, setAromaBroads)}
                 className={clsx(
-                  "p-4 rounded-xl text-left border-2 transition-all font-medium flex items-center justify-between",
-                  aromaBroads.includes(broad) ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-100 bg-white text-slate-700 hover:border-slate-200"
+                  'p-4 rounded-xl text-left border-2 transition-all font-medium flex items-center justify-between',
+                  aromaBroads.includes(broad)
+                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                    : 'border-slate-100 bg-white text-slate-700 hover:border-slate-200',
                 )}
               >
                 {broad}
@@ -246,28 +283,34 @@ export default function NewReview() {
 
           {aromaBroads.length > 0 && (
             <div className="pt-4 border-t border-slate-100">
-              <p className="text-sm font-medium text-slate-500 mb-3">さらに具体的に（複数選択可）</p>
+              <p className="text-sm font-medium text-slate-500 mb-3">
+                さらに具体的に（複数選択可）
+              </p>
               <div className="flex flex-wrap gap-2">
-                {aromaBroads.flatMap(broad => (AROMA_TREE as any)[broad]).map((specific: string) => {
-                  const isSelected = aromaSpecific.includes(specific);
-                  return (
-                    <button
-                      key={specific}
-                      onClick={() => toggleSpecific(specific, aromaSpecific, setAromaSpecific)}
-                      className={clsx(
-                        "px-4 py-2 rounded-full text-sm font-medium border transition-colors flex items-center",
-                        isSelected ? "bg-indigo-600 border-indigo-600 text-white" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                      )}
-                    >
-                      {isSelected && <Check className="w-3 h-3 mr-1" />}
-                      {specific}
-                    </button>
-                  );
-                })}
+                {aromaBroads
+                  .flatMap((broad) => (AROMA_TREE as any)[broad])
+                  .map((specific: string) => {
+                    const isSelected = aromaSpecific.includes(specific);
+                    return (
+                      <button
+                        key={specific}
+                        onClick={() => toggleSpecific(specific, aromaSpecific, setAromaSpecific)}
+                        className={clsx(
+                          'px-4 py-2 rounded-full text-sm font-medium border transition-colors flex items-center',
+                          isSelected
+                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50',
+                        )}
+                      >
+                        {isSelected && <Check className="w-3 h-3 mr-1" />}
+                        {specific}
+                      </button>
+                    );
+                  })}
               </div>
             </div>
           )}
-          
+
           <div className="pt-4 border-t border-slate-100">
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-slate-700">
@@ -276,14 +319,16 @@ export default function NewReview() {
               <button
                 type="button"
                 onClick={handleGenerateAromaAI}
-                disabled={generatingAroma || (aromaBroads.length === 0 && aromaSpecific.length === 0)}
+                disabled={
+                  generatingAroma || (aromaBroads.length === 0 && aromaSpecific.length === 0)
+                }
                 className={clsx(
-                  "flex items-center space-x-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-all border shadow-xs",
+                  'flex items-center space-x-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-all border shadow-xs',
                   generatingAroma
-                    ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                    : (aromaBroads.length === 0 && aromaSpecific.length === 0)
-                      ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
-                      : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 active:scale-95 cursor-pointer"
+                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                    : aromaBroads.length === 0 && aromaSpecific.length === 0
+                      ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
+                      : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 active:scale-95 cursor-pointer',
                 )}
                 title="選択したワードと過去の投稿から50文字程度のコメントを作成します"
               >
@@ -312,7 +357,7 @@ export default function NewReview() {
               💡 選択ワードと過去の投稿コメント（最新30件）を元にAIが約50文字で作成します
             </p>
           </div>
-          
+
           <div className="pt-6">
             <button
               disabled={aromaBroads.length === 0 && !aromaCustom.trim()}
@@ -329,13 +374,15 @@ export default function NewReview() {
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
           <h2 className="text-xl font-bold text-slate-900">味わいの印象は？</h2>
           <div className="grid grid-cols-2 gap-3">
-            {Object.keys(TASTE_TREE).map(broad => (
+            {Object.keys(TASTE_TREE).map((broad) => (
               <button
                 key={broad}
                 onClick={() => toggleSpecific(broad, tasteBroads, setTasteBroads)}
                 className={clsx(
-                  "p-4 rounded-xl text-left border-2 transition-all font-medium flex items-center justify-between",
-                  tasteBroads.includes(broad) ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-100 bg-white text-slate-700 hover:border-slate-200"
+                  'p-4 rounded-xl text-left border-2 transition-all font-medium flex items-center justify-between',
+                  tasteBroads.includes(broad)
+                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                    : 'border-slate-100 bg-white text-slate-700 hover:border-slate-200',
                 )}
               >
                 {broad}
@@ -346,24 +393,30 @@ export default function NewReview() {
 
           {tasteBroads.length > 0 && (
             <div className="pt-4 border-t border-slate-100">
-              <p className="text-sm font-medium text-slate-500 mb-3">さらに具体的に（複数選択可）</p>
+              <p className="text-sm font-medium text-slate-500 mb-3">
+                さらに具体的に（複数選択可）
+              </p>
               <div className="flex flex-wrap gap-2">
-                {tasteBroads.flatMap(broad => (TASTE_TREE as any)[broad]).map((specific: string) => {
-                  const isSelected = tasteSpecific.includes(specific);
-                  return (
-                    <button
-                      key={specific}
-                      onClick={() => toggleSpecific(specific, tasteSpecific, setTasteSpecific)}
-                      className={clsx(
-                        "px-4 py-2 rounded-full text-sm font-medium border transition-colors flex items-center",
-                        isSelected ? "bg-indigo-600 border-indigo-600 text-white" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                      )}
-                    >
-                      {isSelected && <Check className="w-3 h-3 mr-1" />}
-                      {specific}
-                    </button>
-                  );
-                })}
+                {tasteBroads
+                  .flatMap((broad) => (TASTE_TREE as any)[broad])
+                  .map((specific: string) => {
+                    const isSelected = tasteSpecific.includes(specific);
+                    return (
+                      <button
+                        key={specific}
+                        onClick={() => toggleSpecific(specific, tasteSpecific, setTasteSpecific)}
+                        className={clsx(
+                          'px-4 py-2 rounded-full text-sm font-medium border transition-colors flex items-center',
+                          isSelected
+                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50',
+                        )}
+                      >
+                        {isSelected && <Check className="w-3 h-3 mr-1" />}
+                        {specific}
+                      </button>
+                    );
+                  })}
               </div>
             </div>
           )}
@@ -376,14 +429,16 @@ export default function NewReview() {
               <button
                 type="button"
                 onClick={handleGenerateTasteAI}
-                disabled={generatingTaste || (tasteBroads.length === 0 && tasteSpecific.length === 0)}
+                disabled={
+                  generatingTaste || (tasteBroads.length === 0 && tasteSpecific.length === 0)
+                }
                 className={clsx(
-                  "flex items-center space-x-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-all border shadow-xs",
+                  'flex items-center space-x-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-all border shadow-xs',
                   generatingTaste
-                    ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                    : (tasteBroads.length === 0 && tasteSpecific.length === 0)
-                      ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
-                      : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 active:scale-95 cursor-pointer"
+                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                    : tasteBroads.length === 0 && tasteSpecific.length === 0
+                      ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 active:scale-95 cursor-pointer',
                 )}
                 title="選択したワードと過去の投稿から50文字程度のコメントを作成します"
               >
@@ -412,7 +467,7 @@ export default function NewReview() {
               💡 選択ワードと過去の投稿コメント（最新30件）を元にAIが約50文字で作成します
             </p>
           </div>
-          
+
           <div className="pt-6 flex space-x-3">
             <button
               onClick={() => setStep(1)}
@@ -434,18 +489,21 @@ export default function NewReview() {
       {step === 3 && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
           <h2 className="text-xl font-bold text-slate-900">最高の飲み方を記録</h2>
-          
+
           <div>
             <label className="flex items-center text-sm font-medium text-slate-700 mb-2">
-              温度帯 {questData?.targetTemperature && <Lock className="w-3 h-3 ml-1 text-slate-400" />}
+              温度帯{' '}
+              {questData?.targetTemperature && <Lock className="w-3 h-3 ml-1 text-slate-400" />}
             </label>
             <select
               value={temperature}
               onChange={(e) => setTemperature(e.target.value)}
               disabled={!!questData?.targetTemperature}
               className={clsx(
-                "w-full border rounded-xl px-4 py-3 outline-none",
-                questData?.targetTemperature ? "bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:ring-2 focus:ring-indigo-500 text-slate-900"
+                'w-full border rounded-xl px-4 py-3 outline-none',
+                questData?.targetTemperature
+                  ? 'bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed'
+                  : 'bg-white border-slate-200 focus:ring-2 focus:ring-indigo-500 text-slate-900',
               )}
             >
               <option>雪冷え (5℃)</option>
@@ -472,15 +530,18 @@ export default function NewReview() {
               readOnly={!!questData?.targetVessel}
               placeholder="例：ワイングラス、平盃、お猪口"
               className={clsx(
-                "w-full border rounded-xl px-4 py-3 outline-none",
-                questData?.targetVessel ? "bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:ring-2 focus:ring-indigo-500 text-slate-900"
+                'w-full border rounded-xl px-4 py-3 outline-none',
+                questData?.targetVessel
+                  ? 'bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed'
+                  : 'bg-white border-slate-200 focus:ring-2 focus:ring-indigo-500 text-slate-900',
               )}
             />
           </div>
 
           <div>
             <label className="flex items-center text-sm font-medium text-slate-700 mb-2">
-              ペアリングしたおつまみ・料理 {questData?.targetPairing && <Lock className="w-3 h-3 ml-1 text-slate-400" />}
+              ペアリングしたおつまみ・料理{' '}
+              {questData?.targetPairing && <Lock className="w-3 h-3 ml-1 text-slate-400" />}
             </label>
             <input
               type="text"
@@ -489,8 +550,10 @@ export default function NewReview() {
               readOnly={!!questData?.targetPairing}
               placeholder="例：白身魚のカルパッチョ、塩辛"
               className={clsx(
-                "w-full border rounded-xl px-4 py-3 outline-none",
-                questData?.targetPairing ? "bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed" : "bg-white border-slate-200 focus:ring-2 focus:ring-indigo-500 text-slate-900"
+                'w-full border rounded-xl px-4 py-3 outline-none',
+                questData?.targetPairing
+                  ? 'bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed'
+                  : 'bg-white border-slate-200 focus:ring-2 focus:ring-indigo-500 text-slate-900',
               )}
             />
           </div>
@@ -505,9 +568,11 @@ export default function NewReview() {
               className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900"
             />
           </div>
-          
+
           <div className="pt-6">
-            <p className="text-sm font-medium text-slate-700 mb-3 text-center">この組み合わせはどうでしたか？</p>
+            <p className="text-sm font-medium text-slate-700 mb-3 text-center">
+              この組み合わせはどうでしたか？
+            </p>
             <div className="flex gap-2 mb-4">
               <button
                 onClick={() => handleSubmit(1)}

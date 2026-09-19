@@ -10,7 +10,10 @@ import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import FirestorePager from '../lib/firestorepager';
 
 export default function ExplorePage() {
-  const pager = useMemo(() => new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 5), []);
+  const pager = useMemo(
+    () => new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 5),
+    [],
+  );
   const { profile } = useAuth();
   const [query, setQuery] = useState('');
   const [sakes, setSakes] = useState<Sake[]>([]);
@@ -34,7 +37,7 @@ export default function ExplorePage() {
 
     const fetchData = async () => {
       try {
-        const sake = await pager.loadFirst()
+        const sake = await pager.loadFirst();
         if (isMounted) {
           setSakes(sake ?? []);
           setError(null);
@@ -42,7 +45,7 @@ export default function ExplorePage() {
       } catch (err) {
         console.error('Error fetching sake list:', err);
         setError('データの取得に失敗しました。');
-      }finally {
+      } finally {
         if (isMounted) {
           setLoading(false);
         }
@@ -86,7 +89,10 @@ export default function ExplorePage() {
           return;
         }
       } catch (cfErr) {
-        console.warn('Cloud Functions vector search unavailable, attempting client fallback...', cfErr);
+        console.warn(
+          'Cloud Functions vector search unavailable, attempting client fallback...',
+          cfErr,
+        );
       }
 
       setIsSearchingVector(false);
@@ -100,16 +106,17 @@ export default function ExplorePage() {
 
   const handleLoadMore = () => {
     setLoadingMore(true);
-     pager.loadNext()
+    pager
+      .loadNext()
       .then((data) => {
         if (data && data.length > 0) {
-          setSakes(prev => [...prev, ...data]);
+          setSakes((prev) => [...prev, ...data]);
         }
         setLoadingMore(false);
       })
       .catch((err) => {
         console.error('Error fetching sake list:', err);
-          setError('データの取得に失敗しました。');
+        setError('データの取得に失敗しました。');
         setLoadingMore(false);
       });
   };
@@ -122,15 +129,19 @@ export default function ExplorePage() {
     setRebuildMessage(null);
     try {
       const functions = getFunctions(app);
-      const rebuildAll = httpsCallable<{ reindexAll?: boolean }, { success: boolean; count: number; total: number }>(
-        functions,
-        'rebuildAllSakeEmbeddings'
-      );
+      const rebuildAll = httpsCallable<
+        { reindexAll?: boolean },
+        { success: boolean; count: number; total: number }
+      >(functions, 'rebuildAllSakeEmbeddings');
       const res = await rebuildAll({});
-      setRebuildMessage(`✅ ${res.data.count}件 / 全${res.data.total}件 のEmbeddingを正常に生成・更新しました。`);
+      setRebuildMessage(
+        `✅ ${res.data.count}件 / 全${res.data.total}件 のEmbeddingを正常に生成・更新しました。`,
+      );
     } catch (err: any) {
       console.error('Error rebuilding embeddings:', err);
-      setRebuildMessage(`❌ エラー: ${err.message || '再生成に失敗しました。管理者権限をご確認ください。'}`);
+      setRebuildMessage(
+        `❌ エラー: ${err.message || '再生成に失敗しました。管理者権限をご確認ください。'}`,
+      );
     } finally {
       setIsRebuilding(false);
     }
@@ -150,7 +161,9 @@ export default function ExplorePage() {
             className="inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium transition-colors"
             title="管理者用: 全Embedding再生成"
           >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isRebuilding ? 'animate-spin text-indigo-600' : ''}`} />
+            <RefreshCw
+              className={`w-3.5 h-3.5 mr-1 ${isRebuilding ? 'animate-spin text-indigo-600' : ''}`}
+            />
             {isRebuilding ? '再生成中...' : 'ベクトル一括更新'}
           </button>
         )}
@@ -161,7 +174,7 @@ export default function ExplorePage() {
           {rebuildMessage}
         </div>
       )}
-      
+
       <div className="relative mb-6">
         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
           {isSearchingVector ? (
@@ -197,7 +210,10 @@ export default function ExplorePage() {
             </span>
           )}
         </div>
-        <Link to="/sake/new" className="text-sm font-medium text-indigo-600 flex items-center hover:text-indigo-700">
+        <Link
+          to="/sake/new"
+          className="text-sm font-medium text-indigo-600 flex items-center hover:text-indigo-700"
+        >
           <Plus className="w-4 h-4 mr-1" />
           新しい日本酒を登録
         </Link>
@@ -209,14 +225,12 @@ export default function ExplorePage() {
           <p className="text-sm">日本酒データを読み込み中...</p>
         </div>
       ) : error ? (
-        <div className="text-center py-12 text-rose-500 text-sm">
-          {error}
-        </div>
+        <div className="text-center py-12 text-rose-500 text-sm">{error}</div>
       ) : (
         <div className="space-y-3">
           {displayList.map((sake) => (
-            <Link 
-              key={sake.id} 
+            <Link
+              key={sake.id}
               to={`/sake/${sake.id}`}
               className="block bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:border-indigo-300 transition-colors"
             >

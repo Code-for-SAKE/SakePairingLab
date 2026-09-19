@@ -54,7 +54,7 @@ function Navigation() {
 
 function MainLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, signInWithGoogle } = useAuth();
-  
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
@@ -95,7 +95,13 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <MainLayout>
-          <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center text-slate-400 font-medium">読み込み中...</div>}>
+          <Suspense
+            fallback={
+              <div className="min-h-[50vh] flex items-center justify-center text-slate-400 font-medium">
+                読み込み中...
+              </div>
+            }
+          >
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/explore" element={<ExplorePage />} />

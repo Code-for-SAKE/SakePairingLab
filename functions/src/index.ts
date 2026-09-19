@@ -1,4 +1,9 @@
-import { onDocumentWritten, FirestoreEvent, Change, DocumentSnapshot } from 'firebase-functions/v2/firestore';
+import {
+  onDocumentWritten,
+  FirestoreEvent,
+  Change,
+  DocumentSnapshot,
+} from 'firebase-functions/v2/firestore';
 import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { initializeApp, getApps } from 'firebase-admin/app';
@@ -24,9 +29,9 @@ async function generateEmbedding(ai: GoogleGenAI, text: string): Promise<number[
   const response = await ai.models.embedContent({
     model: 'models/gemini-embedding-001',
     contents: text,
-    config: { 
-      outputDimensionality: 2048 // 👈 Firestoreの上限に合わせる
-    }
+    config: {
+      outputDimensionality: 2048, // 👈 Firestoreの上限に合わせる
+    },
   });
 
   const values = (response as any).embedding?.values || response.embeddings?.[0]?.values;
@@ -113,7 +118,7 @@ export const onSakeWrite = onDocumentWritten(
     } catch (err) {
       console.error(`Error generating embedding for sake ${event.params.sakeId}:`, err);
     }
-  }
+  },
 );
 
 /**
@@ -139,15 +144,15 @@ export const searchSakesByVector = onCall(
       const queryVector = await generateEmbedding(ai, queryText.trim());
 
       const targetLimit = typeof searchLimit === 'number' && searchLimit > 0 ? searchLimit : 20;
-      console.log(`Performing vector search for query: "${queryText}" with limit: ${targetLimit} vector values length: ${queryVector.length}`);
-      const vectorQuery = db
-        .collection('sakes')
-        .findNearest({
-          vectorField: 'embedding',
-          queryVector: FieldValue.vector(queryVector),
-          limit: targetLimit,
-          distanceMeasure: 'COSINE',
-        });
+      console.log(
+        `Performing vector search for query: "${queryText}" with limit: ${targetLimit} vector values length: ${queryVector.length}`,
+      );
+      const vectorQuery = db.collection('sakes').findNearest({
+        vectorField: 'embedding',
+        queryVector: FieldValue.vector(queryVector),
+        limit: targetLimit,
+        distanceMeasure: 'COSINE',
+      });
 
       const snap = await vectorQuery.get();
       const results = snap.docs.map((docSnap: any) => ({
@@ -158,9 +163,12 @@ export const searchSakesByVector = onCall(
       return { success: true, results };
     } catch (err: any) {
       console.error('Error during vector search in Cloud Functions:', err);
-      throw new HttpsError('internal', err.message || 'ベクトル検索の実行中にエラーが発生しました。');
+      throw new HttpsError(
+        'internal',
+        err.message || 'ベクトル検索の実行中にエラーが発生しました。',
+      );
     }
-  }
+  },
 );
 
 /**
@@ -203,7 +211,7 @@ export const rebuildAllSakeEmbeddings = onCall(
     }
 
     return { success: true, count, total: sakesSnap.size };
-  }
+  },
 );
 
 /**
@@ -245,5 +253,5 @@ export const rebuildSakeEmbeddingById = onCall(
     });
 
     return { success: true, sakeId };
-  }
+  },
 );

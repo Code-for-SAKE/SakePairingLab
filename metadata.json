@@ -1,1 +1,6 @@
-{"name":"日本酒ペアリングラボ","description":"日本酒の美味しい飲み方を共有するコミュニティアプリ","requestFramePermissions":[],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}
+{
+  "name": "日本酒ペアリングラボ",
+  "description": "日本酒の美味しい飲み方を共有するコミュニティアプリ",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

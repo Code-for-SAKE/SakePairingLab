@@ -17,7 +17,7 @@ export default function Settings() {
 
   useEffect(() => {
     let isMounted = true;
-    getApiKey().then(key => {
+    getApiKey().then((key) => {
       if (isMounted) {
         setHasApiKey(key !== '');
       }
@@ -84,37 +84,50 @@ export default function Settings() {
           type="password"
           placeholder="APIキーを入力"
           value={inputKey}
-          onChange={e => setInputKey(e.target.value)}
+          onChange={(e) => setInputKey(e.target.value)}
           className="block w-full pl-4 pr-3 py-3 border border-slate-200 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-shadow shadow-sm"
         />
         <button
           onClick={handleSaveKey}
           disabled={saving}
           className={clsx(
-            "my-3 w-full flex items-center justify-center space-x-2 text-white bg-indigo-600 py-2 rounded-xl hover:bg-indigo-700 transition-colors",
-            saving && "opacity-50 cursor-not-allowed"
+            'my-3 w-full flex items-center justify-center space-x-2 text-white bg-indigo-600 py-2 rounded-xl hover:bg-indigo-700 transition-colors',
+            saving && 'opacity-50 cursor-not-allowed',
           )}
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : <Check className="w-4 h-4" />}
-          {saved ? "保存しました" : "保存"}
+          {saving ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : saved ? (
+            <Check className="w-4 h-4" />
+          ) : (
+            <Check className="w-4 h-4" />
+          )}
+          {saved ? '保存しました' : '保存'}
         </button>
         {error && <p className="text-red-500 mt-2">{error}</p>}
 
-        <span className="text-sm text-slate-500 text-center mt-2 leading-relaxed">{hasApiKey ? "APIキーが設定されています。" : "APIキーを入力してください。"}</span>
+        <span className="text-sm text-slate-500 text-center mt-2 leading-relaxed">
+          {hasApiKey ? 'APIキーが設定されています。' : 'APIキーを入力してください。'}
+        </span>
         <button
           hidden={!hasApiKey}
           onClick={handleClearKey}
           disabled={saving}
           className={clsx(
-            "my-3 w-full flex items-center justify-center space-x-2 text-white bg-gray-600 py-2 rounded-xl hover:bg-gray-700 transition-colors",
-            saving && "opacity-50 cursor-not-allowed"
+            'my-3 w-full flex items-center justify-center space-x-2 text-white bg-gray-600 py-2 rounded-xl hover:bg-gray-700 transition-colors',
+            saving && 'opacity-50 cursor-not-allowed',
           )}
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : cleared ? <Check className="w-4 h-4" /> : <Check className="w-4 h-4" />}
-          {cleared ? "クリアしました" : "クリア"}
+          {saving ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : cleared ? (
+            <Check className="w-4 h-4" />
+          ) : (
+            <Check className="w-4 h-4" />
+          )}
+          {cleared ? 'クリアしました' : 'クリア'}
         </button>
       </div>
     </div>
   );
 }
-

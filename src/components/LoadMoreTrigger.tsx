@@ -34,10 +34,10 @@ export default function LoadMoreTrigger({
           onLoadMoreRef.current();
         }
       },
-      {         
-        rootMargin: '0px 0px -30px 0px', 
-        threshold: 1.0
-       }
+      {
+        rootMargin: '0px 0px -30px 0px',
+        threshold: 1.0,
+      },
     );
 
     observer.observe(sentinel);
@@ -70,4 +70,3 @@ export default function LoadMoreTrigger({
     </div>
   );
 }
-

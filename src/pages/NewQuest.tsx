@@ -1,6 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Search, Check, Zap, Loader2, FlaskRound, Utensils, Thermometer, GlassWater, Sparkles, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  Search,
+  Check,
+  Zap,
+  Loader2,
+  FlaskRound,
+  Utensils,
+  Thermometer,
+  GlassWater,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,12 +31,19 @@ const TEMPERATURE_OPTIONS = [
 ];
 
 const VESSEL_PRESETS = ['ワイングラス', '平盃', 'お猪口', '薄張りグラス', '陶器', '木枡'];
-const PAIRING_PRESETS = ['白身魚の刺身', '和牛ステーキ', 'ハードチーズ', 'うなぎの蒲焼き', '焼き鳥（タレ）', '塩辛'];
+const PAIRING_PRESETS = [
+  '白身魚の刺身',
+  '和牛ステーキ',
+  'ハードチーズ',
+  'うなぎの蒲焼き',
+  '焼き鳥（タレ）',
+  '塩辛',
+];
 
 export default function NewQuest() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [sakes, setSakes] = useState<Sake[]>([]);
   const [loadingSakes, setLoadingSakes] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,7 +61,7 @@ export default function NewQuest() {
       try {
         setLoadingSakes(true);
         const snap = await getDocs(collection(db, 'sakes'));
-        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sake));
+        const list = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Sake);
         setSakes(list);
       } catch (err) {
         console.error('Error fetching sakes:', err);
@@ -75,15 +94,21 @@ export default function NewQuest() {
 
   const handleTemperatureChange = (val: string) => {
     setTargetTemperature(val);
-    if (val !== '指定なし' && (!title || title.startsWith('【')) && !selectedSake && !targetPairing.trim()) {
+    if (
+      val !== '指定なし' &&
+      (!title || title.startsWith('【')) &&
+      !selectedSake &&
+      !targetPairing.trim()
+    ) {
       setTitle(`【${val}】で開花するペアリングを探せ`);
     }
   };
 
-  const filteredSakes = sakes.filter(s => 
-    s.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.brewery.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.bottle.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredSakes = sakes.filter(
+    (s) =>
+      s.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.brewery.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.bottle.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   // ポイントの自動計算（ユーザー指定不可）
@@ -150,7 +175,10 @@ export default function NewQuest() {
   return (
     <div className="max-w-xl mx-auto pt-6 px-4 pb-20">
       <div className="flex items-center mb-6">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-500 hover:text-slate-900">
+        <button
+          onClick={() => navigate(-1)}
+          className="p-2 -ml-2 text-slate-500 hover:text-slate-900"
+        >
           <ChevronLeft className="w-5 h-5" />
         </button>
         <h1 className="flex-1 text-center font-bold text-slate-900 text-lg">新規クエスト作成</h1>
@@ -158,7 +186,6 @@ export default function NewQuest() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-
         {/* 固定条件設定 (すべて任意) */}
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-5">
           <div>
@@ -211,7 +238,12 @@ export default function NewQuest() {
               <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-indigo-600 font-semibold">{selectedSake.brewery}</p>
-                  <p className="font-bold text-slate-900 text-base">{selectedSake.brand} <span className="text-sm font-normal text-slate-600">{selectedSake.bottle}</span></p>
+                  <p className="font-bold text-slate-900 text-base">
+                    {selectedSake.brand}{' '}
+                    <span className="text-sm font-normal text-slate-600">
+                      {selectedSake.bottle}
+                    </span>
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -235,8 +267,8 @@ export default function NewQuest() {
                   />
                 </div>
 
-                {searchQuery && (
-                  loadingSakes ? (
+                {searchQuery &&
+                  (loadingSakes ? (
                     <div className="flex items-center justify-center py-4 text-slate-400">
                       <Loader2 className="w-4 h-4 animate-spin mr-2 text-indigo-600" />
                       <span className="text-xs">日本酒データを読み込み中...</span>
@@ -255,17 +287,23 @@ export default function NewQuest() {
                           className="w-full text-left p-2.5 rounded-lg border border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors flex items-center justify-between"
                         >
                           <div>
-                            <p className="font-bold text-slate-900 text-xs">{sake.brand} <span className="font-normal text-slate-500">{sake.bottle}</span></p>
+                            <p className="font-bold text-slate-900 text-xs">
+                              {sake.brand}{' '}
+                              <span className="font-normal text-slate-500">{sake.bottle}</span>
+                            </p>
                             <p className="text-[10px] text-slate-400">{sake.brewery}</p>
                           </div>
-                          <span className="text-xs text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded">選択</span>
+                          <span className="text-xs text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded">
+                            選択
+                          </span>
                         </button>
                       ))}
                     </div>
-                  )
-                )}
+                  ))}
                 {!selectedSake && !searchQuery && (
-                  <p className="text-xs text-slate-400 pl-1">※日本酒を指定しない場合、挑戦者はどの日本酒でも自由にお試しできます。</p>
+                  <p className="text-xs text-slate-400 pl-1">
+                    ※日本酒を指定しない場合、挑戦者はどの日本酒でも自由にお試しできます。
+                  </p>
                 )}
               </div>
             )}
@@ -283,7 +321,9 @@ export default function NewQuest() {
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               {TEMPERATURE_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
               ))}
             </select>
           </div>

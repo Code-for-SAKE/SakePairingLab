@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 export default function NewSake() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [brewery, setBrewery] = useState('');
   const [brand, setBrand] = useState('');
   const [bottle, setBottle] = useState('');
@@ -18,7 +18,7 @@ export default function NewSake() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    
+
     setLoading(true);
     try {
       const docRef = await addDoc(collection(db, 'sakes'), {
@@ -27,11 +27,11 @@ export default function NewSake() {
         bottle,
         description,
         createdAt: serverTimestamp(),
-        createdBy: user.uid
+        createdBy: user.uid,
       });
       navigate(`/sake/${docRef.id}`);
     } catch (error) {
-      console.error("Error adding document: ", error);
+      console.error('Error adding document: ', error);
     } finally {
       setLoading(false);
     }
@@ -40,7 +40,10 @@ export default function NewSake() {
   return (
     <div className="max-w-xl mx-auto pt-6 px-4 pb-20">
       <div className="flex items-center mb-6">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-500 hover:text-slate-900">
+        <button
+          onClick={() => navigate(-1)}
+          className="p-2 -ml-2 text-slate-500 hover:text-slate-900"
+        >
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 text-center font-bold text-slate-900">新しい日本酒を登録</div>
@@ -85,7 +88,9 @@ export default function NewSake() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">説明・特徴（任意）</label>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            説明・特徴（任意）
+          </label>
           <textarea
             rows={4}
             value={description}

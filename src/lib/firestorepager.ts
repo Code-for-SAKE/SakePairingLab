@@ -1,5 +1,19 @@
-import { db } from "./firebase";
-import { collection, query, limit, startAfter, getDocs, DocumentSnapshot, QueryOrderByConstraint, QuerySnapshot, DocumentData, Query, QueryCompositeFilterConstraint, QueryNonFilterConstraint, QueryConstraint } from "firebase/firestore";
+import { db } from './firebase';
+import {
+  collection,
+  query,
+  limit,
+  startAfter,
+  getDocs,
+  DocumentSnapshot,
+  QueryOrderByConstraint,
+  QuerySnapshot,
+  DocumentData,
+  Query,
+  QueryCompositeFilterConstraint,
+  QueryNonFilterConstraint,
+  QueryConstraint,
+} from 'firebase/firestore';
 
 export default class FirestorePager<T> {
   collectionName: string;
@@ -21,7 +35,7 @@ export default class FirestorePager<T> {
     this.baseQuery = query(collection(db, this.collectionName));
     this.query = this.baseQuery;
     this.lastVisibleDoc = null; // 最後のドキュメントの状態を保持
-    this.isLastPage = false;    // すべて読み込み終わったかのフラグ
+    this.isLastPage = false; // すべて読み込み終わったかのフラグ
   }
 
   addQuery(...constaints: QueryConstraint[]) {
@@ -33,7 +47,7 @@ export default class FirestorePager<T> {
    * 次の5件（指定件数）を取得するメソッド
    * @returns {Promise<Array<{id: string, [key: string]: any}> | null>} 取得したデータの配列（これ以上なければnull）
    */
-  async loadFirst() : Promise<T[] | null> {
+  async loadFirst(): Promise<T[] | null> {
     try {
       this.reset(); // 状態をリセットしてから最初のページを取得
 
@@ -56,11 +70,13 @@ export default class FirestorePager<T> {
       }
 
       // ドキュメントのデータを配列にして返す
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...(doc.data() as object)
-      } as T));
-
+      return querySnapshot.docs.map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...(doc.data() as object),
+          }) as T,
+      );
     } catch (error) {
       console.error(`[${this.collectionName}] 取得エラー:`, error);
       throw error;
@@ -71,7 +87,7 @@ export default class FirestorePager<T> {
    * 次の5件（指定件数）を取得するメソッド
    * @returns {Promise<Array<{id: string, [key: string]: any}> | null>} 取得したデータの配列（これ以上なければnull）
    */
-  async loadNext() : Promise<T[] | null> {
+  async loadNext(): Promise<T[] | null> {
     if (this.isLastPage) return null;
 
     try {
@@ -102,11 +118,13 @@ export default class FirestorePager<T> {
       }
 
       // ドキュメントのデータを配列にして返す
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...(doc.data() as object)
-      } as T));
-
+      return querySnapshot.docs.map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...(doc.data() as object),
+          }) as T,
+      );
     } catch (error) {
       console.error(`[${this.collectionName}] 取得エラー:`, error);
       throw error;

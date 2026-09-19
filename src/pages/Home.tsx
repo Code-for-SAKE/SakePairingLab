@@ -16,7 +16,10 @@ interface FullReview extends Review {
 }
 
 export default function HomePage() {
-  const pager = useMemo(() => new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5), []);
+  const pager = useMemo(
+    () => new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5),
+    [],
+  );
   const [reviews, setReviews] = useState<FullReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -25,7 +28,6 @@ export default function HomePage() {
 
   const userCache = useState<Map<string, UserProfile>>(() => new Map())[0];
   const sakeCache = useState<Map<string, Sake>>(() => new Map())[0];
-
 
   const enrichReviews = async (rawReviews: FullReview[]) => {
     for (const review of rawReviews) {
@@ -112,7 +114,7 @@ export default function HomePage() {
       const rawReviews: FullReview[] = reviews as FullReview[];
       await enrichReviews(rawReviews);
 
-      setReviews(prev => [...prev, ...rawReviews]);
+      setReviews((prev) => [...prev, ...rawReviews]);
     } catch (e) {
       console.error('Error loading more reviews:', e);
     } finally {
@@ -123,7 +125,7 @@ export default function HomePage() {
   return (
     <div className="max-w-xl mx-auto pt-6 px-4">
       <h1 className="text-2xl font-bold text-slate-900 mb-6">タイムライン</h1>
-      
+
       {loading ? (
         <div className="animate-pulse space-y-4">
           <div className="h-48 bg-slate-200 rounded-2xl"></div>
@@ -136,7 +138,9 @@ export default function HomePage() {
       ) : reviews.length === 0 ? (
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 text-center">
           <p className="text-slate-600 font-medium mb-2">まだテイスティング記録がありません</p>
-          <p className="text-slate-400 text-sm mb-6">日本酒を登録・検索して最初の一杯を記録してみましょう！</p>
+          <p className="text-slate-400 text-sm mb-6">
+            日本酒を登録・検索して最初の一杯を記録してみましょう！
+          </p>
           <Link
             to="/explore"
             className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
@@ -148,27 +152,38 @@ export default function HomePage() {
       ) : (
         <div className="space-y-6">
           {reviews.map((review) => {
-            const createdTime = typeof review.createdAt === 'number' 
-              ? review.createdAt 
-              : review.createdAt?.toMillis 
-                ? review.createdAt.toMillis() 
-                : Date.now();
+            const createdTime =
+              typeof review.createdAt === 'number'
+                ? review.createdAt
+                : review.createdAt?.toMillis
+                  ? review.createdAt.toMillis()
+                  : Date.now();
 
             return (
-              <div key={review.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+              <div
+                key={review.id}
+                className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100"
+              >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold overflow-hidden">
                       {review.user?.photoURL ? (
-                        <img src={review.user.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                        <img
+                          src={review.user.photoURL}
+                          alt="Profile"
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         review.user?.displayName?.[0] || '名'
                       )}
                     </div>
                     <div>
-                      <p className="font-medium text-slate-900">{review.user?.displayName || 'ユーザー'}</p>
+                      <p className="font-medium text-slate-900">
+                        {review.user?.displayName || 'ユーザー'}
+                      </p>
                       <p className="text-xs text-slate-500">
-                        {review.user?.title || 'テイスター'} • {formatDistanceToNow(createdTime, { addSuffix: true, locale: ja })}
+                        {review.user?.title || 'テイスター'} •{' '}
+                        {formatDistanceToNow(createdTime, { addSuffix: true, locale: ja })}
                       </p>
                     </div>
                   </div>
@@ -176,11 +191,13 @@ export default function HomePage() {
                 </div>
 
                 <div className="mb-4">
-                  <Link 
+                  <Link
                     to={`/sake/${review.sakeId}`}
                     className="text-sm font-bold text-indigo-600 hover:text-indigo-800 hover:underline block mb-1"
                   >
-                    {review.sake ? `${review.sake.brand} ${review.sake.bottle}` : '日本酒詳細を見る'}
+                    {review.sake
+                      ? `${review.sake.brand} ${review.sake.bottle}`
+                      : '日本酒詳細を見る'}
                   </Link>
                   {review.comment && (
                     <p className="text-slate-700 text-sm leading-relaxed">{review.comment}</p>
@@ -208,10 +225,16 @@ export default function HomePage() {
                   )}
                 </div>
 
-                {((review.aroma?.broads && review.aroma.broads.length > 0) || (review.taste?.broads && review.taste.broads.length > 0) || review.aroma?.custom || review.taste?.custom) && (
+                {((review.aroma?.broads && review.aroma.broads.length > 0) ||
+                  (review.taste?.broads && review.taste.broads.length > 0) ||
+                  review.aroma?.custom ||
+                  review.taste?.custom) && (
                   <div className="flex flex-wrap gap-1.5 mb-4">
                     {review.aroma?.broads?.map((a, i) => (
-                      <span key={`aroma-${i}`} className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-medium">
+                      <span
+                        key={`aroma-${i}`}
+                        className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-medium"
+                      >
                         香: {a}
                       </span>
                     ))}
@@ -221,7 +244,10 @@ export default function HomePage() {
                       </span>
                     )}
                     {review.taste?.broads?.map((t, i) => (
-                      <span key={`taste-${i}`} className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-medium">
+                      <span
+                        key={`taste-${i}`}
+                        className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-medium"
+                      >
                         味: {t}
                       </span>
                     ))}
@@ -246,11 +272,7 @@ export default function HomePage() {
               </div>
             );
           })}
-          <LoadMoreTrigger
-            onLoadMore={handleLoadMore}
-            hasMore={hasMore}
-            loading={loadingMore}
-          />
+          <LoadMoreTrigger onLoadMore={handleLoadMore} hasMore={hasMore} loading={loadingMore} />
         </div>
       )}
     </div>

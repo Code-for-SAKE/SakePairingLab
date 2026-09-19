@@ -1,0 +1,7 @@
+dist
+functions/lib
+node_modules
+coverage
+.vite
+*.log
+.agents/
