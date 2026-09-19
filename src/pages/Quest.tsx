@@ -63,9 +63,6 @@ export default function QuestPage() {
     let isMounted = true;
     const timer = setTimeout(async () => {
 
-      debugger;
-
-
       try {
         // Try Cloud Function vector search first
         const functions = getFunctions(app);

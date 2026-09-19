@@ -68,9 +68,6 @@ export default function ExplorePage() {
       setIsSearchingVector(true);
       setVectorSearchError(null);
 
-      debugger;
-
-
       try {
         // Try Cloud Function vector search first
         const functions = getFunctions(app);
