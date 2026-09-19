@@ -170,17 +170,7 @@ export default function ExplorePage() {
     }
   };
 
-  const keywordFiltered = sakes.filter((sake) => {
-    const q = query.toLowerCase().trim();
-    if (!q) return true;
-    return (
-      sake.brand?.toLowerCase().includes(q) ||
-      sake.brewery?.toLowerCase().includes(q) ||
-      sake.bottle?.toLowerCase().includes(q)
-    );
-  });
-
-  const displayList = vectorResults && vectorResults.length > 0 ? vectorResults : keywordFiltered;
+  const displayList = vectorResults && vectorResults.length > 0 ? vectorResults : sakes;
   const isUsingVectorSearch = Boolean(query.trim() && vectorResults && vectorResults.length > 0);
 
   return (
