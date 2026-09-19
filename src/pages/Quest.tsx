@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Target, Award, Zap, Loader2, Plus, Search, X, FlaskRound } from 'lucide-react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { orderBy } from 'firebase/firestore';
+import { app } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Quest, Sake } from '../types';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import FirestorePager from '../lib/firestorepager';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const pager = new FirestorePager<Quest>('quests', orderBy('createdAt', 'desc'), 3);
+const sakePager = new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 3);
 
 export default function QuestPage() {
   const navigate = useNavigate();
@@ -50,6 +52,44 @@ export default function QuestPage() {
     };
   }, []);
 
+
+  // Perform AI Vector Search when query changes (with debounce)
+  useEffect(() => {
+    const trimmed = sakeSearchQuery.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+
+      debugger;
+
+
+      try {
+        // Try Cloud Function vector search first
+        const functions = getFunctions(app);
+        const searchByVector = httpsCallable<
+          { queryText: string; limit?: number },
+          { success: boolean; results: Sake[] }
+        >(functions, 'searchSakesByVector');
+
+        const res = await searchByVector({ queryText: trimmed, limit: 20 });
+        if (isMounted && res.data.results) {
+          setSakes(res.data.results);
+          return;
+        }
+      } catch (cfErr) {
+        console.warn('Cloud Functions vector search unavailable, attempting client fallback...', cfErr);
+      }
+    }, 2000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [sakeSearchQuery]);
+
   const handleStartChallenge = async (quest: Quest) => {
     if (quest.sakeId) {
       // 特定日本酒が固定されている場合
@@ -68,8 +108,7 @@ export default function QuestPage() {
       if (sakes.length === 0) {
         setLoadingSakes(true);
         try {
-          const snap = await getDocs(collection(db, 'sakes'));
-          const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sake));
+          const list = await sakePager.loadFirst();
           setSakes(list);
         } catch (err) {
           console.error('Error fetching sakes:', err);
@@ -257,7 +296,7 @@ export default function QuestPage() {
                   </div>
                 </div>
               ) : (
-                filteredSakes.map((sake) => (
+                sakes.map((sake) => (
                   <button
                     key={sake.id}
                     onClick={() => handleSelectSakeAndChallenge(sake)}
