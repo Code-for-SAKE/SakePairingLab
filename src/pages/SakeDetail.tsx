@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { PenTool, ChevronLeft, Loader2, Heart } from 'lucide-react';
 import RatingBadge from '../components/RatingBadge';
+import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Sake, Review, UserProfile } from '../types';
@@ -17,6 +18,8 @@ export default function SakeDetail() {
   const [sake, setSake] = useState<Sake | null>(null);
   const [reviews, setReviews] = useState<ReviewWithUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(10);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -101,6 +104,12 @@ export default function SakeDetail() {
     };
   }, [id]);
 
+  const handleLoadMore = () => {
+    setLoadingMore(true);
+    setVisibleCount(prev => prev + 10);
+    setLoadingMore(false);
+  };
+
   if (loading) {
     return (
       <div className="max-w-xl mx-auto pt-16 px-4 text-center text-slate-400">
@@ -155,7 +164,7 @@ export default function SakeDetail() {
         </div>
       ) : (
         <div className="space-y-4">
-          {reviews.map((review) => (
+          {reviews.slice(0, visibleCount).map((review) => (
             <div key={review.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-3">
@@ -233,6 +242,11 @@ export default function SakeDetail() {
               </div>
             </div>
           ))}
+          <LoadMoreTrigger
+            onLoadMore={handleLoadMore}
+            hasMore={visibleCount < reviews.length}
+            loading={loadingMore}
+          />
         </div>
       )}
     </div>

@@ -1,11 +1,13 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getFunctions } from 'firebase/functions';
 import config from '@/firebase-applet-config.json';
 
-const app = initializeApp(config);
+export const app = initializeApp(config);
 export const db = getFirestore(app, (config as any).firestoreDatabaseId);
 export const auth = getAuth(app);
+export const functions = getFunctions(app);
 export const googleProvider = new GoogleAuthProvider();
 
 // Validate connection

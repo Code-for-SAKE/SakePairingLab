@@ -5,12 +5,15 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Quest, Sake } from '../types';
+import LoadMoreTrigger from '../components/LoadMoreTrigger';
 
 export default function QuestPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const [quests, setQuests] = useState<Quest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(10);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // 日本酒自由クエストに挑戦する際のアクティブモーダル用
   const [activeQuestForSelect, setActiveQuestForSelect] = useState<Quest | null>(null);
@@ -104,6 +107,12 @@ export default function QuestPage() {
     s.bottle.toLowerCase().includes(sakeSearchQuery.toLowerCase())
   );
 
+  const handleLoadMore = () => {
+    setLoadingMore(true);
+    setVisibleCount(prev => prev + 10);
+    setLoadingMore(false);
+  };
+
   return (
     <div className="max-w-xl mx-auto pt-6 px-4 pb-20">
       <div className="flex items-center justify-between mb-6">
@@ -151,7 +160,7 @@ export default function QuestPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {quests.map((quest) => (
+          {quests.slice(0, visibleCount).map((quest) => (
             <div key={quest.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500"></div>
               
@@ -192,6 +201,11 @@ export default function QuestPage() {
               </button>
             </div>
           ))}
+          <LoadMoreTrigger
+            onLoadMore={handleLoadMore}
+            hasMore={visibleCount < quests.length}
+            loading={loadingMore}
+          />
         </div>
       )}
 

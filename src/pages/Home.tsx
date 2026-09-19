@@ -1,72 +1,84 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
+import { orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Review, UserProfile, Sake } from '../types';
 import { Heart, MessageCircle, Plus } from 'lucide-react';
 import RatingBadge from '../components/RatingBadge';
+import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
+import FirestorePager from '../lib/firestorepager';
 
 interface FullReview extends Review {
   user?: UserProfile;
   sake?: Sake;
 }
 
+const pager = new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 2);
+
 export default function HomePage() {
   const [reviews, setReviews] = useState<FullReview[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const userCache = useState<Map<string, UserProfile>>(() => new Map())[0];
+  const sakeCache = useState<Map<string, Sake>>(() => new Map())[0];
+
+
+  const enrichReviews = async (rawReviews: FullReview[]) => {
+    for (const review of rawReviews) {
+      if (review.userId && !userCache.has(review.userId)) {
+        try {
+          const uDoc = await getDoc(doc(db, 'users', review.userId));
+          if (uDoc.exists()) {
+            userCache.set(review.userId, { id: uDoc.id, ...uDoc.data() } as UserProfile);
+          }
+        } catch (err) {
+          console.error('Error fetching user:', err);
+        }
+      }
+      if (review.userId && userCache.has(review.userId)) {
+        review.user = userCache.get(review.userId);
+      }
+
+      if (review.sakeId && !sakeCache.has(review.sakeId)) {
+        try {
+          const sDoc = await getDoc(doc(db, 'sakes', review.sakeId));
+          if (sDoc.exists()) {
+            sakeCache.set(review.sakeId, { id: sDoc.id, ...sDoc.data() } as Sake);
+          }
+        } catch (err) {
+          console.error('Error fetching sake:', err);
+        }
+      }
+      if (review.sakeId && sakeCache.has(review.sakeId)) {
+        review.sake = sakeCache.get(review.sakeId);
+      }
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
 
-    const fetchReviews = async () => {
+    const fetchInitialReviews = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const q = query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(20));
-        const snap = await getDocs(q);
-
-        const rawReviews: FullReview[] = snap.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as FullReview));
-
-        // Fetch user profiles & sake info in parallel / with cache
-        const userCache = new Map<string, UserProfile>();
-        const sakeCache = new Map<string, Sake>();
-
-        for (const review of rawReviews) {
-          if (review.userId && !userCache.has(review.userId)) {
-            try {
-              const uDoc = await getDoc(doc(db, 'users', review.userId));
-              if (uDoc.exists()) {
-                userCache.set(review.userId, { id: uDoc.id, ...uDoc.data() } as UserProfile);
-              }
-            } catch (err) {
-              console.error('Error fetching user:', err);
-            }
+        const reviews = await pager.loadFirst();
+        setHasMore(!pager.isLastPage);
+        if (reviews === null) {
+          if (isMounted) {
+            setReviews([]);
           }
-          if (review.userId && userCache.has(review.userId)) {
-            review.user = userCache.get(review.userId);
-          }
-
-          if (review.sakeId && !sakeCache.has(review.sakeId)) {
-            try {
-              const sDoc = await getDoc(doc(db, 'sakes', review.sakeId));
-              if (sDoc.exists()) {
-                sakeCache.set(review.sakeId, { id: sDoc.id, ...sDoc.data() } as Sake);
-              }
-            } catch (err) {
-              console.error('Error fetching sake:', err);
-            }
-          }
-          if (review.sakeId && sakeCache.has(review.sakeId)) {
-            review.sake = sakeCache.get(review.sakeId);
-          }
+          return;
         }
+
+        const rawReviews: FullReview[] = reviews as FullReview[];
+        await enrichReviews(rawReviews);
 
         if (isMounted) {
           setReviews(rawReviews);
@@ -83,12 +95,31 @@ export default function HomePage() {
       }
     };
 
-    fetchReviews();
+    fetchInitialReviews();
 
     return () => {
       isMounted = false;
     };
   }, []);
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return;
+
+    try {
+      setLoadingMore(true);
+      const reviews = await pager.loadNext();
+      setHasMore(!pager.isLastPage);
+
+      const rawReviews: FullReview[] = reviews as FullReview[];
+      await enrichReviews(rawReviews);
+
+      setReviews(prev => [...prev, ...rawReviews]);
+    } catch (e) {
+      console.error('Error loading more reviews:', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   return (
     <div className="max-w-xl mx-auto pt-6 px-4">
@@ -216,6 +247,11 @@ export default function HomePage() {
               </div>
             );
           })}
+          <LoadMoreTrigger
+            onLoadMore={handleLoadMore}
+            hasMore={hasMore}
+            loading={loadingMore}
+          />
         </div>
       )}
     </div>

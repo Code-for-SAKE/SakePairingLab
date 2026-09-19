@@ -97,3 +97,23 @@ ${pastCommentsText}
   return text.replace(/^["「](.*)["」]$/, '$1').trim();
 }
 
+/**
+ * Generates text embedding for search query using Gemini text-embedding-004.
+ */
+export async function generateQueryEmbedding(text: string): Promise<number[]> {
+  const apiKey = await resolveApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const response = await ai.models.embedContent({
+    model: 'models/gemini-embedding-001',
+    contents: text,
+  });
+
+  const values = (response as any).embedding?.values || response.embeddings?.[0]?.values;
+  if (!values || values.length === 0) {
+    throw new Error('ベクトルデータ（Embedding）の生成に失敗しました。');
+  }
+
+  return values;
+}
+
