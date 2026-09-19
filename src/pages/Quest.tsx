@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Target, Award, Zap, Loader2, Plus, Search, X, FlaskRound } from 'lucide-react';
 import { orderBy } from 'firebase/firestore';
@@ -106,7 +106,7 @@ export default function QuestPage() {
         setLoadingSakes(true);
         try {
           const list = await sakePager.loadFirst();
-          setSakes(list);
+          setSakes(list || []);
         } catch (err) {
           console.error('Error fetching sakes:', err);
         } finally {

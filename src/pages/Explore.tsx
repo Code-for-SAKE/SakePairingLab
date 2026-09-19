@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Plus, Loader2, Sparkles, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
@@ -35,8 +35,8 @@ export default function ExplorePage() {
 
     pager.loadFirst()
       .then((data) => {
-        if (isMounted) {
-          setSakes(data);
+        if (isMounted) {  
+          setSakes(data ?? []);
           setLoading(false);
         }
       })
@@ -86,44 +86,7 @@ export default function ExplorePage() {
         console.warn('Cloud Functions vector search unavailable, attempting client fallback...', cfErr);
       }
 
-      try {
-        // Compute cosine similarity manually across sakes loaded with embeddings
-        const scored = sakes
-          .filter((sake: any) => sake.embedding && Array.isArray(sake.embedding))
-          .map((sake: any) => {
-            const vec: number[] = sake.embedding;
-            let dotProduct = 0;
-            let normA = 0;
-            let normB = 0;
-            for (let i = 0; i < Math.min(vec.length, queryVector.length); i++) {
-              dotProduct += vec[i] * queryVector[i];
-              normA += vec[i] * vec[i];
-              normB += queryVector[i] * queryVector[i];
-            }
-            const similarity = normA && normB ? dotProduct / (Math.sqrt(normA) * Math.sqrt(normB)) : 0;
-            return { sake: sake as Sake, similarity };
-          })
-          .sort((a, b) => b.similarity - a.similarity)
-          .map((item) => item.sake);
-
-        if (isMounted) {
-          if (scored.length > 0) {
-            setVectorResults(scored);
-          } else {
-            setVectorResults(null);
-          }
-        }
-      } catch (err: any) {
-        console.warn('Vector search fallback to keyword search:', err);
-        if (isMounted) {
-          setVectorResults(null);
-          setVectorSearchError(err.message || 'AI検索でエラーが発生したためキーワード検索で表示しています。');
-        }
-      } finally {
-        if (isMounted) {
-          setIsSearchingVector(false);
-        }
-      }
+      setIsSearchingVector(false);
     }, 2000);
 
     return () => {

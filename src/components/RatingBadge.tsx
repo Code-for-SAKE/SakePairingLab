@@ -1,4 +1,3 @@
-import React from 'react';
 import { Frown, Smile, Sparkles } from 'lucide-react';
 
 interface RatingBadgeProps {

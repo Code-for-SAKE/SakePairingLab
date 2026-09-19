@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Search, Check, Zap, Loader2, FlaskRound, Utensils, Thermometer, GlassWater, Sparkles, X } from 'lucide-react';
 import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
