@@ -15,7 +15,7 @@ interface FullReview extends Review {
   sake?: Sake;
 }
 
-const pager = new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 2);
+const pager = new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5);
 
 export default function HomePage() {
   const [reviews, setReviews] = useState<FullReview[]>([]);

@@ -9,8 +9,8 @@ import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import FirestorePager from '../lib/firestorepager';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
-const pager = new FirestorePager<Quest>('quests', orderBy('createdAt', 'desc'), 3);
-const sakePager = new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 3);
+const pager = new FirestorePager<Quest>('quests', orderBy('createdAt', 'desc'), 5);
+const sakePager = new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 5);
 
 export default function QuestPage() {
   const navigate = useNavigate();

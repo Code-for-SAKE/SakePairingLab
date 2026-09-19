@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import FirestorePager from '../lib/firestorepager';
 
-const pager = new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 2);
+const pager = new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 5);
 
 export default function ExplorePage() {
   const { profile } = useAuth();

@@ -3,22 +3,24 @@ import { useParams, Link } from 'react-router-dom';
 import { PenTool, ChevronLeft, Loader2, Heart } from 'lucide-react';
 import RatingBadge from '../components/RatingBadge';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Sake, Review, UserProfile } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { ja } from 'date-fns/locale';
+import FirestorePager from '../lib/firestorepager';
 
 interface ReviewWithUser extends Review {
   user?: UserProfile;
 }
+
+const pager = new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5);
 
 export default function SakeDetail() {
   const { id } = useParams<{ id: string }>();
   const [sake, setSake] = useState<Sake | null>(null);
   const [reviews, setReviews] = useState<ReviewWithUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [visibleCount, setVisibleCount] = useState(10);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +31,8 @@ export default function SakeDetail() {
       setError('日本酒IDが指定されていません');
       return;
     }
+    // この日本酒のレビューを取得するためのクエリを追加
+    pager.addQuery(where('sakeId', '==', id));
 
     setLoading(true);
     setError(null);
@@ -50,13 +54,13 @@ export default function SakeDetail() {
         }
 
         // Fetch reviews for this sake
-        const reviewsQ = query(collection(db, 'reviews'), where('sakeId', '==', id));
-        const reviewsSnap = await getDocs(reviewsQ);
-        const fetchedReviews: ReviewWithUser[] = reviewsSnap.docs.map(d => ({
-          id: d.id,
-          ...d.data()
-        } as ReviewWithUser));
-
+        const fetchedReviews = await pager.loadFirst() as ReviewWithUser[] | null;
+        if (fetchedReviews === null) {
+          if (isMounted) {
+            setReviews([]);
+          }
+          return;
+        }
         // Fetch user profiles for these reviews
         const userCache = new Map<string, UserProfile>();
         for (const rev of fetchedReviews) {
@@ -104,9 +108,12 @@ export default function SakeDetail() {
     };
   }, [id]);
 
-  const handleLoadMore = () => {
+  const handleLoadMore = async () => {
     setLoadingMore(true);
-    setVisibleCount(prev => prev + 10);
+    const review = await pager.loadNext() as ReviewWithUser[] | null;
+    if (review) {
+      setReviews(prev => [...prev, ...review]);
+    }
     setLoadingMore(false);
   };
 
@@ -164,7 +171,7 @@ export default function SakeDetail() {
         </div>
       ) : (
         <div className="space-y-4">
-          {reviews.slice(0, visibleCount).map((review) => (
+          {reviews.map((review) => (
             <div key={review.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-3">
@@ -244,7 +251,7 @@ export default function SakeDetail() {
           ))}
           <LoadMoreTrigger
             onLoadMore={handleLoadMore}
-            hasMore={visibleCount < reviews.length}
+            hasMore={pager.isLastPage === false}
             loading={loadingMore}
           />
         </div>

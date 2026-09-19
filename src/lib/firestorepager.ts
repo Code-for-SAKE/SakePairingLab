@@ -1,8 +1,9 @@
 import { db } from "./firebase";
-import { collection, query, limit, startAfter, getDocs, DocumentSnapshot, QueryOrderByConstraint, QuerySnapshot, DocumentData } from "firebase/firestore";
+import { collection, query, limit, startAfter, getDocs, DocumentSnapshot, QueryOrderByConstraint, QuerySnapshot, DocumentData, Query, QueryCompositeFilterConstraint, QueryNonFilterConstraint, QueryConstraint } from "firebase/firestore";
 
 export default class FirestorePager<T> {
   collectionName: string;
+  query: Query<DocumentData, DocumentData>;
   orderBy: QueryOrderByConstraint;
   pageSize: number;
   lastVisibleDoc: null | DocumentSnapshot;
@@ -16,9 +17,13 @@ export default class FirestorePager<T> {
     this.collectionName = collectionName;
     this.orderBy = orderBy;
     this.pageSize = pageSize;
-    
+    this.query = query(collection(db, this.collectionName));
     this.lastVisibleDoc = null; // 最後のドキュメントの状態を保持
     this.isLastPage = false;    // すべて読み込み終わったかのフラグ
+  }
+
+  addQuery(...constaints: QueryConstraint[]) {
+    this.query = query(this.query, ...constaints);
   }
 
   /**
@@ -29,12 +34,9 @@ export default class FirestorePager<T> {
     if (this.isLastPage) return null;
 
     try {
-      const colRef = collection(db, this.collectionName);
-      let q;
 
-        // 初回読み込み
-        q = query(colRef, this.orderBy, limit(this.pageSize));
-
+      // 初回読み込み
+      const q = query(this.query, this.orderBy, limit(this.pageSize));
       const querySnapshot = await getDocs(q);
 
       // データが空の場合
@@ -71,16 +73,14 @@ export default class FirestorePager<T> {
     if (this.isLastPage) return null;
 
     try {
-      const colRef = collection(db, this.collectionName);
       let q;
-
       // 引数で受け取った fieldName や direction を動的にセット
       if (this.lastVisibleDoc === null) {
         // 初回読み込み
-        q = query(colRef, this.orderBy, limit(this.pageSize));
+        q = query(this.query, this.orderBy, limit(this.pageSize));
       } else {
         // 2回目以降（カーソル指定）
-        q = query(colRef, this.orderBy, startAfter(this.lastVisibleDoc), limit(this.pageSize));
+        q = query(this.query, this.orderBy, startAfter(this.lastVisibleDoc), limit(this.pageSize));
       }
 
       const querySnapshot = await getDocs(q);
