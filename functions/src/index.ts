@@ -139,10 +139,12 @@ export const searchSakesByVector = onCall(
       const queryVector = await generateEmbedding(ai, queryText.trim());
 
       const targetLimit = typeof searchLimit === 'number' && searchLimit > 0 ? searchLimit : 20;
-
+      console.log(`Performing vector search for query: "${queryText}" with limit: ${targetLimit} vector values length: ${queryVector.length}`);
       const vectorQuery = db
         .collection('sakes')
-        .findNearest('embedding', FieldValue.vector(queryVector), {
+        .findNearest({
+          vectorField: 'embedding',
+          queryVector: FieldValue.vector(queryVector),
           limit: targetLimit,
           distanceMeasure: 'COSINE',
         });
