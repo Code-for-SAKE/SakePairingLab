@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Review, UserProfile, Sake } from '../types';
@@ -15,9 +15,8 @@ interface FullReview extends Review {
   sake?: Sake;
 }
 
-const pager = new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5);
-
 export default function HomePage() {
+  const pager = useMemo(() => new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5), []);
   const [reviews, setReviews] = useState<FullReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);

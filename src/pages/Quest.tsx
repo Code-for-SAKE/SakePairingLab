@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Target, Award, Zap, Loader2, Plus, Search, X, FlaskRound } from 'lucide-react';
 import { orderBy } from 'firebase/firestore';
@@ -9,10 +9,9 @@ import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import FirestorePager from '../lib/firestorepager';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
-const pager = new FirestorePager<Quest>('quests', orderBy('createdAt', 'desc'), 5);
-const sakePager = new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 5);
-
 export default function QuestPage() {
+  const pager = useMemo(() => new FirestorePager<Quest>('quests', orderBy('createdAt', 'desc'), 5), []);
+  const sakePager = useMemo(() => new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 5), []);
   const navigate = useNavigate();
   const { profile } = useAuth();
   const [quests, setQuests] = useState<Quest[]>([]);

@@ -4,6 +4,7 @@ import { collection, query, limit, startAfter, getDocs, DocumentSnapshot, QueryO
 export default class FirestorePager<T> {
   collectionName: string;
   query: Query<DocumentData, DocumentData>;
+  baseQuery: Query<DocumentData, DocumentData>;
   orderBy: QueryOrderByConstraint;
   pageSize: number;
   lastVisibleDoc: null | DocumentSnapshot;
@@ -17,13 +18,15 @@ export default class FirestorePager<T> {
     this.collectionName = collectionName;
     this.orderBy = orderBy;
     this.pageSize = pageSize;
-    this.query = query(collection(db, this.collectionName));
+    this.baseQuery = query(collection(db, this.collectionName));
+    this.query = this.baseQuery;
     this.lastVisibleDoc = null; // 最後のドキュメントの状態を保持
     this.isLastPage = false;    // すべて読み込み終わったかのフラグ
   }
 
   addQuery(...constaints: QueryConstraint[]) {
-    this.query = query(this.query, ...constaints);
+    this.query = query(this.baseQuery, ...constaints);
+    this.reset();
   }
 
   /**
@@ -31,9 +34,8 @@ export default class FirestorePager<T> {
    * @returns {Promise<Array<{id: string, [key: string]: any}> | null>} 取得したデータの配列（これ以上なければnull）
    */
   async loadFirst() : Promise<T[] | null> {
-    if (this.isLastPage) return null;
-
     try {
+      this.reset(); // 状態をリセットしてから最初のページを取得
 
       // 初回読み込み
       const q = query(this.query, this.orderBy, limit(this.pageSize));
@@ -56,8 +58,8 @@ export default class FirestorePager<T> {
       // ドキュメントのデータを配列にして返す
       return querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
-      })) as T[];
+        ...(doc.data() as object)
+      } as T));
 
     } catch (error) {
       console.error(`[${this.collectionName}] 取得エラー:`, error);
@@ -102,8 +104,8 @@ export default class FirestorePager<T> {
       // ドキュメントのデータを配列にして返す
       return querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
-      })) as T[];
+        ...(doc.data() as object)
+      } as T));
 
     } catch (error) {
       console.error(`[${this.collectionName}] 取得エラー:`, error);

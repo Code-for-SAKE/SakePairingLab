@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Award, Settings, TrendingUp, Loader2, PenTool, LogOut } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
@@ -23,10 +23,9 @@ interface ReviewWithUser extends Review {
   user?: UserProfile;
 }
 
-const pager = new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5);
-
 export default function MyPage() {
   const { user, profile, signInWithGoogle, logout } = useAuth();
+  const pager = useMemo(() => new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5), [user?.uid]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Loader2, Sparkles, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
@@ -9,9 +9,8 @@ import { useAuth } from '../contexts/AuthContext';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import FirestorePager from '../lib/firestorepager';
 
-const pager = new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 5);
-
 export default function ExplorePage() {
+  const pager = useMemo(() => new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 5), []);
   const { profile } = useAuth();
   const [query, setQuery] = useState('');
   const [sakes, setSakes] = useState<Sake[]>([]);
@@ -33,20 +32,24 @@ export default function ExplorePage() {
     setLoading(true);
     setError(null);
 
-    pager.loadFirst()
-      .then((data) => {
-        if (isMounted) {  
-          setSakes(data ?? []);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        console.error('Error fetching sake list:', err);
+    const fetchData = async () => {
+      try {
+        const sake = await pager.loadFirst()
         if (isMounted) {
-          setError('データの取得に失敗しました。');
+          setSakes(sake ?? []);
+          setError(null);
+        }
+      } catch (err) {
+        console.error('Error fetching sake list:', err);
+        setError('データの取得に失敗しました。');
+      }finally {
+        if (isMounted) {
           setLoading(false);
         }
-      });
+      }
+    };
+
+    fetchData();
 
     return () => {
       isMounted = false;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { PenTool, ChevronLeft, Loader2, Heart } from 'lucide-react';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
@@ -9,7 +9,6 @@ import FirestorePager from '../lib/firestorepager';
 import { enrichReviews } from '../lib/review';
 import { ReviewCard } from '../components/ReviewCard';
 
-const pager = new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5);
 
 export default function SakeDetail() {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +17,7 @@ export default function SakeDetail() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pager = useMemo(() => new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5), [id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -49,7 +49,7 @@ export default function SakeDetail() {
         }
 
         // Fetch reviews for this sake
-        const fetchedReviews = await pager.loadFirst() as ReviewWithUser[] | null;
+        const fetchedReviews = await pager.loadFirst();
         const enrichedReviews = await enrichReviews(fetchedReviews);
         if (isMounted) {
           setReviews(enrichedReviews);
@@ -65,7 +65,6 @@ export default function SakeDetail() {
         }
       }
     };
-
     fetchData();
 
     return () => {
@@ -75,9 +74,9 @@ export default function SakeDetail() {
 
   const handleLoadMore = async () => {
     setLoadingMore(true);
-    const review = await pager.loadNext() as ReviewWithUser[] | null;
+    const review = await pager.loadNext();
     const enrichedReviews = await enrichReviews(review);
-  setReviews(prev => [...prev, ...enrichedReviews]);
+    setReviews(prev => [...prev, ...enrichedReviews]);
     setLoadingMore(false);
   };
 
