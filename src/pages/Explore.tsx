@@ -79,7 +79,7 @@ export default function ExplorePage() {
           { success: boolean; results: Sake[] }
         >(functions, 'searchSakesByVector');
 
-        const res = await searchByVector({ queryText: trimmed, limit: 20 });
+        const res = await searchByVector({ queryText: trimmed, limit: 5 });
         if (isMounted && res.data.results) {
           setVectorResults(res.data.results);
           setIsSearchingVector(false);
@@ -133,14 +133,16 @@ export default function ExplorePage() {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [query, sakes]);
+  }, [query]);
 
   const handleLoadMore = () => {
     setLoadingMore(true);
      pager.loadNext()
       .then((data) => {
-          setSakes(sakes.concat(data));
-       setLoadingMore(false);
+        if (data && data.length > 0) {
+          setSakes(prev => [...prev, ...data]);
+        }
+        setLoadingMore(false);
       })
       .catch((err) => {
         console.error('Error fetching sake list:', err);

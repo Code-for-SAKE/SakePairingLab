@@ -74,7 +74,7 @@ export default function QuestPage() {
           { success: boolean; results: Sake[] }
         >(functions, 'searchSakesByVector');
 
-        const res = await searchByVector({ queryText: trimmed, limit: 20 });
+        const res = await searchByVector({ queryText: trimmed, limit: 5 });
         if (isMounted && res.data.results) {
           setSakes(res.data.results);
           return;
