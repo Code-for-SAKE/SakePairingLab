@@ -57,7 +57,3 @@ export type Quest = {
   createdBy?: string;
   createdAt?: any;
 };
-
-export interface ReviewWithUser extends Review {
-  user?: UserProfile;
-}

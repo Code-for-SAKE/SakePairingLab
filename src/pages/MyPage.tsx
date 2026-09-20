@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { where, orderBy } from 'firebase/firestore';
-import { Review, UserProfile } from '../types';
+import { Review } from '../types';
 import { Link } from 'react-router-dom';
 import FirestorePager from '../lib/firestorepager';
 import { enrichReviews } from '../lib/review';
@@ -18,10 +18,6 @@ import { ReviewCard } from '../components/ReviewCard';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
 
 const TASTE_CATEGORIES = ['フルーティ', 'スッキリ・軽快', '熟成', 'ふくよか・旨味', '酸味', '甘味'];
-
-interface ReviewWithUser extends Review {
-  user?: UserProfile;
-}
 
 export default function MyPage() {
   const { user, profile, signInWithGoogle, logout } = useAuth();
@@ -46,7 +42,7 @@ export default function MyPage() {
       setLoading(true);
       try {
         const myReviews = await pager.loadFirst();
-        const enrichedReviews = await enrichReviews(myReviews);
+        const enrichedReviews = await enrichReviews(myReviews, { withSake: true });
         if (isMounted) {
           setReviews(enrichedReviews);
         }
@@ -68,8 +64,8 @@ export default function MyPage() {
 
   const handleLoadMore = async () => {
     setLoadingMore(true);
-    const review = (await pager.loadNext()) as ReviewWithUser[] | null;
-    const enrichedReviews = await enrichReviews(review);
+    const review = await pager.loadNext();
+    const enrichedReviews = await enrichReviews(review, { withSake: true });
     setReviews((prev) => [...prev, ...enrichedReviews]);
     setLoadingMore(false);
   };

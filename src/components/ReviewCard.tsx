@@ -1,26 +1,54 @@
 import { formatDistanceToNow } from 'date-fns';
-import { ReviewWithUser } from '../types';
+import { Review, Sake, UserProfile } from '../types';
 import { ja } from 'date-fns/locale';
 import RatingBadge from './RatingBadge';
-import { Heart } from 'lucide-react';
+import { Heart, MessageCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-interface ReviewCardProps {
-  review: ReviewWithUser;
+type ReviewCardReview = Review & { user?: UserProfile; sake?: Sake };
+
+interface ReviewCardProps<T extends ReviewCardReview> {
+  review: T;
 }
 
-export const ReviewCard: React.FC<ReviewCardProps> = ({ review }: ReviewCardProps) => {
+export const ReviewCard = <T extends ReviewCardReview>(props: ReviewCardProps<T>) => {
+  const { review } = props;
   return (
     <div key={review.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm">
-            {review.user?.displayName?.[0] || '名'}
+      <div className="flex items-center justify-between mb-4">
+        {review.user ? (
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold overflow-hidden">
+              {review.user?.photoURL ? (
+                <img
+                  src={review.user.photoURL}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                review.user?.displayName?.[0] || '名'
+              )}
+            </div>
+            <div>
+              <p className="font-medium text-slate-900">{review.user?.displayName || 'ユーザー'}</p>
+              <p className="text-xs text-slate-500">
+                {review.user?.title || 'テイスター'} •{' '}
+                {review.createdAt
+                  ? formatDistanceToNow(
+                      typeof review.createdAt === 'number'
+                        ? review.createdAt
+                        : review.createdAt.toMillis
+                          ? review.createdAt.toMillis()
+                          : Date.now(),
+                      { addSuffix: true, locale: ja },
+                    )
+                  : ''}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-medium text-slate-900 text-sm">
-              {review.user?.displayName || 'ユーザー'}
-            </p>
-            <p className="text-xs text-slate-400">
+        ) : (
+          <div className="flex items-center space-x-3">
+            <p className="text-xs text-slate-500">
               {review.createdAt
                 ? formatDistanceToNow(
                     typeof review.createdAt === 'number'
@@ -33,9 +61,21 @@ export const ReviewCard: React.FC<ReviewCardProps> = ({ review }: ReviewCardProp
                 : ''}
             </p>
           </div>
-        </div>
+        )}
         <RatingBadge rating={review.rating} />
       </div>
+      {review.sake ? (
+        <div className="mb-4">
+          <Link
+            to={`/sake/${review.sakeId}`}
+            className="text-sm font-bold text-indigo-600 hover:text-indigo-800 hover:underline block mb-1"
+          >
+            {review.sake ? `${review.sake.brand} ${review.sake.bottle}` : '日本酒詳細を見る'}
+          </Link>
+        </div>
+      ) : (
+        <div className="mb-4"></div>
+      )}
 
       {review.comment && <p className="text-slate-700 text-sm mb-3">{review.comment}</p>}
 
@@ -95,10 +135,14 @@ export const ReviewCard: React.FC<ReviewCardProps> = ({ review }: ReviewCardProp
       )}
 
       <div className="flex items-center text-slate-400 text-xs mt-2">
-        <span className="flex items-center space-x-1">
-          <Heart className="w-3.5 h-3.5 text-slate-400" />
+        <button className="flex items-center space-x-1 mx-1 hover:text-indigo-500 transition-colors">
+          <Heart className="w-5 h-5" />
           <span>{review.likesCount || 0}</span>
-        </span>
+        </button>
+        <button className="flex items-center space-x-2 mx-1 hover:text-indigo-500 transition-colors">
+          <MessageCircle className="w-5 h-5" />
+          <span className="text-sm">0</span>
+        </button>
       </div>
     </div>
   );

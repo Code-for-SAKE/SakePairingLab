@@ -4,7 +4,7 @@ import { PenTool, ChevronLeft, Loader2, Heart } from 'lucide-react';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import { doc, getDoc, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Sake, Review, ReviewWithUser } from '../types';
+import { Sake, Review } from '../types';
 import FirestorePager from '../lib/firestorepager';
 import { enrichReviews } from '../lib/review';
 import { ReviewCard } from '../components/ReviewCard';
@@ -12,7 +12,7 @@ import { ReviewCard } from '../components/ReviewCard';
 export default function SakeDetail() {
   const { id } = useParams<{ id: string }>();
   const [sake, setSake] = useState<Sake | null>(null);
-  const [reviews, setReviews] = useState<ReviewWithUser[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export default function SakeDetail() {
 
         // Fetch reviews for this sake
         const fetchedReviews = await pager.loadFirst();
-        const enrichedReviews = await enrichReviews(fetchedReviews);
+        const enrichedReviews = await enrichReviews(fetchedReviews, { withUser: true });
         if (isMounted) {
           setReviews(enrichedReviews);
         }
@@ -77,7 +77,7 @@ export default function SakeDetail() {
   const handleLoadMore = async () => {
     setLoadingMore(true);
     const review = await pager.loadNext();
-    const enrichedReviews = await enrichReviews(review);
+    const enrichedReviews = await enrichReviews(review, { withUser: true });
     setReviews((prev) => [...prev, ...enrichedReviews]);
     setLoadingMore(false);
   };
@@ -142,7 +142,7 @@ export default function SakeDetail() {
         </div>
       ) : (
         <div className="space-y-4">
-          {reviews.map((review: ReviewWithUser) => (
+          {reviews.map((review) => (
             <ReviewCard key={review.id} review={review} />
           ))}
           <LoadMoreTrigger
