@@ -5,15 +5,25 @@ import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { setUserApiKey, getApiKey } from '../lib/gemini';
 
+const DISPLAY_NAME_MAX_LENGTH = 50;
+
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, profile, updateProfile } = useAuth();
   const navigate = useNavigate();
+  const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
+  const [savingName, setSavingName] = useState(false);
+  const [nameSaved, setNameSaved] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [inputKey, setInputKey] = useState('');
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [cleared, setCleared] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDisplayName(profile?.displayName ?? '');
+  }, [profile?.displayName]);
 
   useEffect(() => {
     let isMounted = true;
@@ -26,6 +36,30 @@ export default function Settings() {
       isMounted = false;
     };
   }, []);
+
+  const trimmedName = displayName.trim();
+  const isNameChanged = trimmedName !== (profile?.displayName ?? '');
+  const canSaveName =
+    !savingName &&
+    isNameChanged &&
+    trimmedName.length > 0 &&
+    trimmedName.length <= DISPLAY_NAME_MAX_LENGTH;
+
+  const handleSaveDisplayName = async () => {
+    if (!canSaveName) return;
+    setSavingName(true);
+    setNameError(null);
+    try {
+      await updateProfile({ displayName: trimmedName });
+      setNameSaved(true);
+      setTimeout(() => setNameSaved(false), 3000);
+    } catch (e) {
+      console.error(e);
+      setNameError('表示名の保存に失敗しました');
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   const handleSaveKey = async () => {
     setSaving(true);
@@ -76,6 +110,40 @@ export default function Settings() {
           <ArrowLeft className="w-6 h-6" />
         </button>
         <h1 className="text-2xl font-bold text-slate-900 ml-2">設定</h1>
+      </div>
+
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6">
+        <h3 className="font-bold text-slate-900 mb-1">表示名</h3>
+        <p className="text-sm text-slate-500 mb-4 leading-relaxed">
+          タイムラインやレビューに表示される名前です。Googleアカウントの名前とは別に設定できます。
+        </p>
+        <input
+          type="text"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          maxLength={DISPLAY_NAME_MAX_LENGTH}
+          placeholder="表示名を入力"
+          className="block w-full pl-4 pr-3 py-3 border border-slate-200 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-shadow shadow-sm"
+        />
+        <p className="text-xs text-slate-400 mt-1.5 text-right">
+          {displayName.length} / {DISPLAY_NAME_MAX_LENGTH}
+        </p>
+        <button
+          onClick={handleSaveDisplayName}
+          disabled={!canSaveName}
+          className={clsx(
+            'my-3 w-full flex items-center justify-center space-x-2 text-white bg-indigo-600 py-2 rounded-xl hover:bg-indigo-700 transition-colors',
+            !canSaveName && !nameSaved && 'opacity-50 cursor-not-allowed',
+          )}
+        >
+          {savingName ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Check className="w-4 h-4" />
+          )}
+          <span>{nameSaved ? '保存しました' : '保存'}</span>
+        </button>
+        {nameError && <p className="text-red-500 mt-2 text-sm">{nameError}</p>}
       </div>
 
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6">

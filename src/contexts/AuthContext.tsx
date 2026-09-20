@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider, db } from '../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { UserProfile } from '../types';
+
+export type ProfileUpdates = Partial<Pick<UserProfile, 'displayName' | 'photoURL'>>;
 
 type AuthContextType = {
   user: User | null;
@@ -10,6 +12,7 @@ type AuthContextType = {
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (updates: ProfileUpdates) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,8 +65,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signOut(auth);
   };
 
+  const updateProfile = async (updates: ProfileUpdates) => {
+    if (!user) {
+      throw new Error('ログインが必要です。');
+    }
+    await updateDoc(doc(db, 'users', user.uid), updates);
+    setProfile((prev) => (prev ? { ...prev, ...updates } : prev));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signInWithGoogle, logout }}>
+    <AuthContext.Provider
+      value={{ user, profile, loading, signInWithGoogle, logout, updateProfile }}
+    >
       {children}
     </AuthContext.Provider>
   );
