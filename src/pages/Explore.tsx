@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Loader2, Sparkles, RefreshCw } from 'lucide-react';
+import { Search, Plus, Loader2, Sparkles, RefreshCw, Compass } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -207,6 +207,10 @@ export default function ExplorePage() {
             {isRebuilding ? '再生成中...' : 'クラスタ一括更新'}
           </button>
         )}
+        <Link to="./sake">
+          <Compass className="w-6 h-6" />
+          <span className="text-xs mt-1 font-medium">近さマップ</span>
+        </Link>
       </div>
 
       {rebuildMessage && (

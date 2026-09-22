@@ -11,6 +11,7 @@ import Header from './components/Header';
 
 const HomePage = lazy(() => import('./pages/Home'));
 const ExplorePage = lazy(() => import('./pages/Explore'));
+const ExploreSake = lazy(() => import('./pages/ExploreSake'));
 const QuestPage = lazy(() => import('./pages/Quest'));
 const MyPage = lazy(() => import('./pages/MyPage'));
 const SakeDetail = lazy(() => import('./pages/SakeDetail'));
@@ -112,6 +113,7 @@ export default function App() {
               <Route path="/sake/new" element={<NewSake />} />
               <Route path="/sake/:id" element={<SakeDetail />} />
               <Route path="/sake/:id/review" element={<NewReview />} />
+              <Route path="explore/sake" element={<ExploreSake />} />
             </Routes>
           </Suspense>
         </MainLayout>
