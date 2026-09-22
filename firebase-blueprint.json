@@ -42,7 +42,8 @@
           "type": "array",
           "items": { "type": "string", "maxLength": 50 },
           "maxLength": 20
-        }
+        },
+        "custom": { "type": "string", "maxLength": 200 }
       },
       "required": ["broads", "specific"]
     },
@@ -95,6 +96,20 @@
         "createdAt": { "type": "number" }
       },
       "required": ["title", "status", "rewardPoints", "createdBy", "createdAt"]
+    },
+    "ClusterDoc": {
+      "title": "ClusterDoc",
+      "description": "Stores the cluster information for sake embeddings",
+      "type": "object",
+      "properties": {
+        "count": { "type": "number" },
+        "centroid": {
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["count", "centroid", "createdAt"]
     }
   },
   "firestore": {
@@ -113,6 +128,10 @@
     "/quests/{questId}": {
       "schema": { "$ref": "#/entities/Quest" },
       "description": "Stores pairing challenge quests"
+    },
+    "/clustersakes/{clusterId}": {
+      "schema": { "$ref": "#/entities/ClusterDoc" },
+      "description": "Stores cluster information for sake embeddings"
     }
   }
 }

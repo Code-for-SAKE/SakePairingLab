@@ -168,6 +168,11 @@ service cloud.firestore {
       allow create: if isSignedIn() && isValidId(questId) && isValidQuest(incoming());
     }
 
+    match /clustersakes/{clusterId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && isValidId(clusterId);
+    }
   }
 }
 
