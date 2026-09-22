@@ -438,7 +438,7 @@ export const rebuildSakeNetworkData = onCall(
 
       const centroidPromises = centroids.map(async (centroid, index) => {
         await db
-          .collection('clustersakes')
+          .collection('clusterSakes')
           .doc(index.toString())
           .set({
             centroid: FieldValue.vector(centroid),
@@ -500,6 +500,20 @@ export const rebuildSakeNetworkData = onCall(
 
       // 4. フロントエンドがそのまま解釈できるクリーンなオブジェクト構造で返却
       const responseData: NetworkResponse = { nodes, links };
+
+      // 5. Firestoreに保存（フロントエンドが毎回再計算せずに読み取れるようにキャッシュ）
+      await db.collection('sakeNetwork').doc('latest').set({
+        nodes,
+        links,
+        nodeCount: nodes.length,
+        linkCount: links.length,
+        clusterCount: K,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      console.log(
+        `Saved sake network to Firestore: ${nodes.length} nodes, ${links.length} links, ${K} clusters`,
+      );
+
       return responseData;
     } catch (error) {
       console.error('Error creating sake network API:', error);
@@ -508,14 +522,21 @@ export const rebuildSakeNetworkData = onCall(
   },
 );
 
-export const getNetworkDataVector = onCall(
-  {
-    secrets: [geminiApiKey],
-  },
-  async (request: CallableRequest) => {
-    const isAdmin = await checkIsAdmin(request.auth);
-    if (!isAdmin) {
-      throw new HttpsError('permission-denied', '管理者権限が必要です。');
-    }
-  },
-);
+export const getNetworkDataVector = onCall(async (request: CallableRequest) => {
+  const doc = await db.collection('sakeNetwork').doc('latest').get();
+
+  if (!doc.exists) {
+    throw new HttpsError(
+      'not-found',
+      'ネットワークデータがまだ生成されていません。管理者に「クラスタ一括更新」を依頼してください。',
+    );
+  }
+
+  const data = doc.data()!;
+  const response: NetworkResponse = {
+    nodes: data.nodes || [],
+    links: data.links || [],
+  };
+
+  return response;
+});

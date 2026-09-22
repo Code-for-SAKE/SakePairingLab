@@ -168,10 +168,17 @@ service cloud.firestore {
       allow create: if isSignedIn() && isValidId(questId) && isValidQuest(incoming());
     }
 
-    match /clustersakes/{clusterId} {
+    match /clusterSakes/{clusterId} {
       allow get: if true;
       allow list: if true;
       allow create: if isSignedIn() && isValidId(clusterId);
+    }
+
+    // ネットワークデータ: Cloud Functions (Admin SDK) からのみ書き込み、クライアントは読み取り専用
+    match /sakeNetwork/{networkId} {
+      allow get: if true;
+      allow list: if true;
+      allow write: if false;
     }
   }
 }
