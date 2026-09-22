@@ -404,16 +404,16 @@ export const rebuildSakeNetworkData = onCall(
         }
 
         snapshot.forEach((doc) => {
-          const data = doc.data() as Partial<Review>;
-          if (data.embedding && Array.isArray(data.embedding) && data.embedding.length === 2048) {
+          const data = doc.data() as Partial<Sake>;
+          if (data.embedding) {
             docs.push({
               id: doc.id,
-              name: data.sakeId || '不明な銘柄',
-              info: `【${data.sakeId}】${data.temperature}・${data.vessel} × ${data.pairing} ➔ ${data.aroma}/${data.taste} rating:(${data.rating})`,
+              name: `${data.brewery} - ${data.brand} - ${data.bottle}` || '不明な銘柄',
+              info: `${data.description}`,
             });
 
             // クラスタリングに使用するembeddingだけを切り出してメモリに保持
-            contextEmbeddings1024.push(data.embedding);
+            contextEmbeddings1024.push(data.embedding.toArray());
           }
         });
 
@@ -437,13 +437,12 @@ export const rebuildSakeNetworkData = onCall(
       const centroids: number[][] = ans.centroids;
 
       const centroidPromises = centroids.map(async (centroid, index) => {
-        console.log(`Sake cluster ${index}`);
         await db
           .collection('clustersakes')
           .doc(index.toString())
           .set({
             centroid: FieldValue.vector(centroid),
-            createdAt: Date.now(),
+            createdAt: FieldValue.serverTimestamp(),
           });
       });
 
@@ -460,7 +459,7 @@ export const rebuildSakeNetworkData = onCall(
       const linkSet = new Set<string>(); // 重複リンク（A->B と B->A）を排除する用
 
       const LIMIT_PER_NODE = 4; // 各レビューから伸ばす線の最大数（スパゲッティ化防止）
-      const SIMILARITY_THRESHOLD = 0.8; // 類似度80%以上の「かなり近い体験」だけを結ぶ
+      const SIMILARITY_THRESHOLD = 0.2; // 類似度80%以上の「かなり近い体験」だけを結ぶ
 
       // 各ノードを起点に、最もベクトルが近いレビューをFirestoreにパラレルで問い合わせる
       const linkPromises = docs.map(async (doc, index) => {
@@ -469,6 +468,7 @@ export const rebuildSakeNetworkData = onCall(
           queryVector: FieldValue.vector(contextEmbeddings1024[index]),
           limit: LIMIT_PER_NODE + 1, // 自分自身が含まれるため +1
           distanceMeasure: 'COSINE',
+          distanceResultField: 'distance',
         });
 
         const querySnapshot = await vectorQuery.get();

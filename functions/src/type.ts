@@ -1,3 +1,5 @@
+import { VectorValue } from '@google-cloud/firestore';
+
 export type UserProfile = {
   id: string;
   displayName: string;
@@ -17,7 +19,7 @@ export type Sake = {
   imageUrl?: string;
   createdAt?: any;
   createdBy?: string;
-  embedding?: number[];
+  embedding?: VectorValue;
   reviewCount: number;
 };
 
@@ -42,7 +44,7 @@ export type Review = {
   createdAt: any;
   likesCount: number;
   questId?: string;
-  embedding?: number[];
+  embedding?: VectorValue;
 };
 
 export type Quest = {
@@ -62,7 +64,7 @@ export type Quest = {
 };
 
 export interface ClusterDoc {
-  centroid: number[]; // ★このクラスタの中心を表す1024次元ベクトル（インデックス対象）
+  centroid: VectorValue; // ★このクラスタの中心を表す1024次元ベクトル（インデックス対象）
   count: number; // このクラスタに分類された累計のお酒の件数
   createdAt?: any;
 }

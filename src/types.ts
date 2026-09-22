@@ -57,3 +57,22 @@ export type Quest = {
   createdBy?: string;
   createdAt?: any;
 };
+
+// レスポンスの型定義
+export interface NetworkNode {
+  id: string;
+  label: string;
+  cluster: number;
+  info: string;
+}
+
+export interface NetworkLink {
+  source: string;
+  target: string;
+  weight: number;
+}
+
+export interface NetworkResponse {
+  nodes: NetworkNode[];
+  links: NetworkLink[];
+}

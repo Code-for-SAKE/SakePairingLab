@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { orderBy } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '../lib/firebase';
-import { Sake } from '../types';
+import { NetworkResponse, Sake } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import FirestorePager from '../lib/firestorepager';
@@ -147,6 +147,33 @@ export default function ExplorePage() {
     }
   };
 
+  const handleRebuildAllClusters = async () => {
+    if (!window.confirm('全ての日本酒のクラスタを再生成しますか？')) {
+      return;
+    }
+    setIsRebuilding(true);
+    setRebuildMessage(null);
+    try {
+      const functions = getFunctions(app);
+      const rebuildAll = httpsCallable<{ reindexAll?: boolean }, NetworkResponse>(
+        functions,
+        'rebuildSakeNetworkData',
+      );
+      const res = await rebuildAll({});
+      console.log('Rebuild clusters response:', res.data);
+      setRebuildMessage(
+        `✅ ノード数:${res.data.nodes.length}件 リンク数:${res.data.links.length}件 のクラスタを正常に生成・更新しました。`,
+      );
+    } catch (err: any) {
+      console.error('Error rebuilding embeddings:', err);
+      setRebuildMessage(
+        `❌ エラー: ${err.message || '再生成に失敗しました。管理者権限をご確認ください。'}`,
+      );
+    } finally {
+      setIsRebuilding(false);
+    }
+  };
+
   const displayList = vectorResults && vectorResults.length > 0 ? vectorResults : sakes;
   const isUsingVectorSearch = Boolean(query.trim() && vectorResults && vectorResults.length > 0);
 
@@ -165,6 +192,19 @@ export default function ExplorePage() {
               className={`w-3.5 h-3.5 mr-1 ${isRebuilding ? 'animate-spin text-indigo-600' : ''}`}
             />
             {isRebuilding ? '再生成中...' : 'ベクトル一括更新'}
+          </button>
+        )}
+        {profile?.role === 'admin' && (
+          <button
+            onClick={handleRebuildAllClusters}
+            disabled={isRebuilding}
+            className="inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium transition-colors"
+            title="管理者用: 全クラスタ再生成"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 mr-1 ${isRebuilding ? 'animate-spin text-indigo-600' : ''}`}
+            />
+            {isRebuilding ? '再生成中...' : 'クラスタ一括更新'}
           </button>
         )}
       </div>
