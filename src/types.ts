@@ -1,3 +1,5 @@
+import { VectorValue } from 'firebase/firestore';
+
 export type UserProfile = {
   id: string;
   displayName: string;
@@ -17,6 +19,7 @@ export type Sake = {
   imageUrl?: string;
   createdAt?: any;
   createdBy?: string;
+  embedding?: VectorValue;
 };
 
 export type TasteProfile = {

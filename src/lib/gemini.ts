@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Modality } from '@google/genai';
 
 /**
  * Retrieves the Gemini API key.
@@ -114,4 +114,73 @@ export async function generateQueryEmbedding(text: string): Promise<number[]> {
   }
 
   return values;
+}
+
+/**
+ * Generates text from embedding
+ */
+export async function generateFlavorImagePrompt(
+  name: string,
+  embedding: number[],
+): Promise<string> {
+  const apiKey = await resolveApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  // 3. 【ステップ1】1024次元ベクトルを画像用英語プロンプトに逆翻訳
+  const textPrompt = `You are a data visualizer. Below is a 1024-dimensional embedding vector representing the flavor profile of the Japanese sake "${name}":
+      [${embedding.join(', ')}]
+      Based on this semantic vector data, interpret its characteristics and generate a detailed English image prompt for an abstract digital art that visualizes this sake's taste and aroma.
+      Output ONLY the final image prompt text in English.`;
+
+  const promptResponse = await ai.models.generateContent({
+    model: 'gemini-3.1-flash-lite',
+    contents: textPrompt,
+  });
+
+  const generatedVisualPrompt =
+    'An abstract, elegant digital painting visualizing a premium sensory experience of Japanese sake. NO TEXT. Prompt: ' +
+    promptResponse.text;
+  if (!generatedVisualPrompt) {
+    throw new Error('画像用プロンプトの生成に失敗しました。');
+  }
+
+  console.log('Generated Visual Prompt:', generatedVisualPrompt);
+
+  return generatedVisualPrompt;
+}
+
+/**
+ * Generates text from embedding
+ */
+export async function generateFlavorImage(
+  prompt: string,
+): Promise<{ base64Data: string; mimeType: string }> {
+  const apiKey = await resolveApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  // 4. 【ステップ2】画像生成モデルを呼び出し、味わいアートを生成
+  const imageResponse = await ai.models.generateContent({
+    model: 'gemini-3.1-flash-lite-image',
+    contents: prompt,
+    config: {
+      // 出力モダリティにIMAGEを指定
+      responseModalities: [Modality.IMAGE],
+      imageConfig: {
+        aspectRatio: '1:1',
+      },
+    },
+  });
+
+  // 5. レスポンスからインラインの画像データ（Base64）を抽出
+  const imagePart = imageResponse.candidates?.[0]?.content?.parts?.find((part: any) =>
+    part.inlineData?.mimeType?.startsWith('image/'),
+  );
+
+  if (!imagePart || !imagePart.inlineData) {
+    throw new Error('画像の出力に失敗しました。');
+  }
+
+  const base64Data = imagePart.inlineData.data ?? ''; // Base64文字列
+  const mimeType = imagePart.inlineData.mimeType ?? 'image/png'; // "image/png" など
+  return { base64Data, mimeType };
 }

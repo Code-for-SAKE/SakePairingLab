@@ -8,6 +8,7 @@ import { Sake, Review } from '../types';
 import FirestorePager from '../lib/firestorepager';
 import { enrichReviews } from '../lib/review';
 import { ReviewCard } from '../components/ReviewCard';
+import { SakeFlavorImage } from '../components/SakeFlavorImage';
 
 export default function SakeDetail() {
   const { id } = useParams<{ id: string }>();
@@ -119,6 +120,14 @@ export default function SakeDetail() {
       </Link>
 
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 text-center">
+        <div className="w-40 m-auto mb-2">
+          <SakeFlavorImage
+            sakeId={sake.id}
+            sakeName={`${sake.brewery}-${sake.brand}-${sake.bottle}`}
+            bottle={sake.bottle}
+            embedding={sake.embedding?.toArray()}
+          />
+        </div>
         <p className="text-sm font-medium text-slate-500 mb-2">{sake.brewery}</p>
         <h1 className="text-3xl font-bold text-slate-900 mb-2">{sake.brand}</h1>
         <h2 className="text-lg text-slate-700 mb-4">{sake.bottle}</h2>
