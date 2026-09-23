@@ -1,14 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { PenTool, ChevronLeft, Loader2, Heart } from 'lucide-react';
+import { PenTool, ChevronLeft, Loader2, Search } from 'lucide-react';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import { doc, getDoc, where, orderBy } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { app, db } from '../lib/firebase';
 import { Sake, Review } from '../types';
 import FirestorePager from '../lib/firestorepager';
 import { enrichReviews } from '../lib/review';
 import { ReviewCard } from '../components/ReviewCard';
 import { SakeFlavorImage } from '../components/SakeFlavorImage';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { SakeCard } from '../components/SakeCard';
+import clsx from 'clsx';
 
 export default function SakeDetail() {
   const navigate = useNavigate();
@@ -18,6 +21,10 @@ export default function SakeDetail() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [vectorResults, setVectorResults] = useState<Sake[] | null>(null);
+  const [isSearchingVector, setIsSearchingVector] = useState(false);
+  const [vectorSearchError, setVectorSearchError] = useState<string | null>(null);
+
   const pager = useMemo(
     () => new FirestorePager<Review>('reviews', orderBy('createdAt', 'desc'), 5),
     [id],
@@ -35,6 +42,9 @@ export default function SakeDetail() {
 
     setLoading(true);
     setError(null);
+    setVectorResults(null);
+    setSake(null);
+    setReviews([]);
 
     const fetchData = async () => {
       try {
@@ -83,6 +93,46 @@ export default function SakeDetail() {
     setReviews((prev) => [...prev, ...enrichedReviews]);
     setLoadingMore(false);
   };
+
+  const handleSearchNear = async () => {
+    console.log('search vector');
+
+    setVectorResults(null);
+    setIsSearchingVector(true);
+    setVectorSearchError(null);
+
+    try {
+      // Try Cloud Function vector search first
+      const functions = getFunctions(app);
+      const searchByVector = httpsCallable<
+        { queryVector: number[]; limit?: number },
+        { success: boolean; results: Sake[] }
+      >(functions, 'searchSakesByVector');
+
+      const vector = sake?.embedding;
+      if (!vector) return;
+
+      const res = await searchByVector({ queryVector: vector.toArray(), limit: 4 });
+      if (res.data.results) {
+        // 最初の1件は必ず自身なので先頭を削る
+        const near = res.data.results;
+        near.shift();
+        setVectorResults(near);
+        setIsSearchingVector(false);
+        return;
+      }
+    } catch (cfErr: any) {
+      alert(`ベクトル検索に失敗しました: ${cfErr.message || 'エラーが発生しました'}`);
+      console.warn(
+        'Cloud Functions vector search unavailable, attempting client fallback...',
+        cfErr,
+      );
+      setVectorSearchError(cfErr.message);
+    }
+    setIsSearchingVector(false);
+  };
+
+  const displayList = vectorResults ?? [];
 
   if (loading) {
     return (
@@ -133,6 +183,31 @@ export default function SakeDetail() {
         <h1 className="text-3xl font-bold text-slate-900 mb-2">{sake.brand}</h1>
         <h2 className="text-lg text-slate-700 mb-4">{sake.bottle}</h2>
         <p className="text-slate-600 leading-relaxed text-sm">{sake.description}</p>
+      </div>
+
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-bold text-lg text-slate-900">似ているお酒</h3>
+        <button
+          onClick={handleSearchNear}
+          className={clsx(
+            'px-4 py-2 rounded-lg text-sm font-medium flex items-center shadow-sm transition-colors',
+            isSearchingVector
+              ? 'bg-slate-600 text-white'
+              : 'bg-indigo-600 text-white hover:bg-indigo-700 ',
+          )}
+        >
+          {isSearchingVector ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <Search className="w-4 h-4 mr-2" />
+          )}
+          似ているお酒を探す
+        </button>
+      </div>
+      <div className="mb-5 space-y-3">
+        {displayList.map((sake) => (
+          <SakeCard sake={sake} />
+        ))}
       </div>
 
       <div className="flex justify-between items-center mb-4">
