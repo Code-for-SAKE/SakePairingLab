@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { PenTool, ChevronLeft, Loader2, Heart } from 'lucide-react';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import { doc, getDoc, where, orderBy } from 'firebase/firestore';
@@ -11,6 +11,7 @@ import { ReviewCard } from '../components/ReviewCard';
 import { SakeFlavorImage } from '../components/SakeFlavorImage';
 
 export default function SakeDetail() {
+  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [sake, setSake] = useState<Sake | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -111,13 +112,13 @@ export default function SakeDetail() {
 
   return (
     <div className="max-w-xl mx-auto pt-6 px-4 pb-20">
-      <Link
-        to="/explore"
+      <button
+        onClick={() => navigate(-1)}
         className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 mb-6"
       >
         <ChevronLeft className="w-4 h-4 mr-1" />
         戻る
-      </Link>
+      </button>
 
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 text-center">
         <div className="w-40 m-auto mb-2">
