@@ -1,15 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { generateFlavorImage, generateFlavorImagePrompt } from '../lib/gemini';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { Copy, Edit, Upload } from 'lucide-react';
+import { Copy, Edit } from 'lucide-react';
 
 const UPLOAD_SIZE = 1024; // アップロード画像サイズ (px)
 
 interface SakeFlavorImageProps {
   sakeId: string;
   sakeName: string;
-  bottle: string; // 頭文字表示に使用
-  embedding: number[] | undefined;
+  embedding?: number[] | undefined;
+  editable?: boolean;
 }
 
 /** 画像ファイルを Canvas で UPLOAD_SIZE×UPLOAD_SIZE にリサイズ（センタークロップ）→ PNG data URL */
@@ -47,17 +47,17 @@ function resizeImageToDataUrl(file: File): Promise<string> {
   });
 }
 
-/** bottle 文字列から頭文字を最大2文字取得 */
-function getInitials(bottle: string): string {
-  const chars = [...bottle.trim()];
+/** 文字列から頭文字を最大2文字取得 */
+function getInitials(name: string): string {
+  const chars = [...name.trim()];
   return chars.slice(0, 2).join('');
 }
 
 export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
   sakeId,
   sakeName,
-  bottle,
   embedding,
+  editable = false,
 }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
@@ -156,82 +156,31 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
 
   // ─── 画像エリア ────────────────────────────────────
   const imageArea = (
-    <div style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1' }}>
+    <div className="relative w-full aspect-square">
       {isInitialLoading ? (
         /* 初期読み込みスケルトン */
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: '12px',
-            background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
-            backgroundSize: '200% 100%',
-            animation: 'skeleton-shimmer 1.4s infinite',
-          }}
-        />
+        <div className="h-full w-full rounded-2xl bg-[linear-gradient(90deg,#f0f0f0_25%,#e0e0e0_50%,#f0f0f0_75%)] animate-[skeleton-shimmer_1.4s_infinite]" />
       ) : imageUrl ? (
         <img
+          className="w-full h-full rounded-2xl object-cover block"
           src={imageUrl}
           alt={`${sakeName}の味わいビジュアル`}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            borderRadius: '12px',
-            display: 'block',
-          }}
         />
       ) : (
         /* 画像なし：bottleの頭文字 */
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <span
-            style={{
-              fontSize: 'clamp(40px, 15vw, 96px)',
-              fontWeight: 'bold',
-              color: 'rgba(255,255,255,0.9)',
-              lineHeight: 1,
-              userSelect: 'none',
-            }}
-          >
-            {getInitials(bottle)}
+        <div className="flex h-full w-full @container items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#667eea_0%,#764ba2_100%)]">
+          <span className="text-[40cqw] text-white select-none font-bold">
+            {getInitials(sakeName)}
           </span>
         </div>
       )}
 
       {/* 右下の編集ボタン */}
-      {!isInitialLoading && (
+      {editable && !isInitialLoading && (
         <button
           onClick={openModal}
           title="画像を編集"
-          style={{
-            position: 'absolute',
-            bottom: '10px',
-            right: '10px',
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            background: 'rgba(255,255,255,0.25)',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-            fontSize: '16px',
-            transition: 'transform 0.15s',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.1)')}
-          onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+          className="absolute bottom-2 right-2 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-none bg-white/20 text-lg transition-transform duration-150 hover:scale-110"
         >
           <Edit />
         </button>
@@ -245,54 +194,17 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
       {/* オーバーレイ */}
       <div
         onClick={closeModal}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.5)',
-          zIndex: 1000,
-          animation: 'fadeIn 0.15s ease',
-        }}
+        className="fixed inset-0 z-1000 animate-[fadeIn_0.15s_ease] bg-black/50"
       />
       {/* モーダル本体 */}
-      <div
-        style={{
-          position: 'fixed',
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 1001,
-          background: '#fff',
-          borderRadius: '16px',
-          padding: '24px',
-          width: 'min(92vw, 420px)',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-          animation: 'slideUp 0.2s ease',
-        }}
-      >
+      <div className="fixed left-1/2 top-1/2 z-1001 w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
         {/* ヘッダー */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '20px',
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#1a1a2e' }}>
-            🎨 味わいアートを設定
-          </h3>
+        <div className="mb-5 flex items-center justify-between">
+          <h3 className="m-0 text-base font-bold text-black">味わいアートを設定</h3>
           <button
             onClick={closeModal}
             disabled={busy}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: busy ? 'not-allowed' : 'pointer',
-              fontSize: '20px',
-              color: '#888',
-              lineHeight: 1,
-              padding: '2px 6px',
-            }}
+            className="cursor-pointer border-none bg-transparent px-1.5 py-0.5 text-xl leading-none text-gray-500 disabled:cursor-not-allowed"
           >
             ×
           </button>
@@ -301,136 +213,69 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
         {/* AI生成失敗時：プロンプト表示 */}
         {failedPrompt ? (
           <div>
-            <div
-              style={{
-                background: '#FFF8E1',
-                border: '1px solid #FFD54F',
-                borderRadius: '8px',
-                padding: '12px',
-                marginBottom: '16px',
-              }}
-            >
-              <p
-                style={{
-                  margin: '0 0 8px 0',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
-                  color: '#E65100',
-                }}
-              >
-                ⚠️ AI画像生成に失敗しました
-              </p>
-              <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#555' }}>
+            <div className="mb-4 rounded-lg border border-slate-100 p-3">
+              <p className="mb-2 text-sm font-bold text-red-800">AI画像生成に失敗しました</p>
+              <p className="mb-2.5 text-[13px] text-slate-500">
                 以下のプロンプトを使って他の画像生成AIで画像を作成してアップロードしてください。
               </p>
-              <div
-                style={{
-                  background: '#FFF',
-                  border: '1px solid #E0E0E0',
-                  borderRadius: '6px',
-                  padding: '10px',
-                  fontSize: '12px',
-                  color: '#333',
-                  maxHeight: '140px',
-                  overflowY: 'auto',
-                  fontFamily: 'monospace',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-all',
-                }}
-              >
+              <div className="max-h-35 overflow-y-auto break-all whitespace-pre-wrap rounded-md border border-slate-100 bg-slate-100 p-2.5 font-mono text-xs text-slate-600">
                 {failedPrompt}
               </div>
               <button
                 onClick={() => navigator.clipboard.writeText(failedPrompt)}
-                style={{
-                  marginTop: '8px',
-                  padding: '4px 10px',
-                  fontSize: '12px',
-                  background: '#F5F5F5',
-                  border: '1px solid #DDD',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  color: '#555',
-                }}
+                className="mt-2 cursor-pointer rounded border border-slate-100 px-2.5 py-1 text-xs text-slate-500"
               >
                 <Copy />
                 コピー
               </button>
             </div>
             {/* 手動アップロードは引き続き可能 */}
-            <p
-              style={{ fontSize: '13px', color: '#555', margin: '0 0 10px 0', fontWeight: 'bold' }}
-            >
-              生成した画像をアップロード
-            </p>
+            <p className="mb-2.5 text-sm font-bold text-slate-600">生成した画像をアップロード</p>
           </div>
         ) : (
           /* 通常：AI生成ボタン */
-          <div style={{ marginBottom: '12px' }}>
-            <p style={{ fontSize: '13px', color: '#666', margin: '0 0 10px 0' }}>
-              【{bottle}】のEmbeddingからAIが味わいアートを自動生成します。
+          <div className="mb-3">
+            <p className="mb-2.5 text-sm text-slate-600">
+              【{sakeName}】のEmbeddingからAIが味わいアートを自動生成します。
             </p>
             <button
               onClick={generateAndSaveImage}
               disabled={busy || !embedding}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: busy || !embedding ? '#BDC3C7' : '#E67E22',
-                color: '#FFF',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: busy || !embedding ? 'not-allowed' : 'pointer',
-                fontWeight: 'bold',
-                fontSize: '14px',
-                marginBottom: '4px',
-              }}
+              className={`mb-1 w-full rounded-lg border-none p-3 text-sm font-bold text-white ${busy || !embedding ? 'cursor-not-allowed bg-slate-400' : 'cursor-pointer bg-indigo-400 hover:bg-indigo-500'}`}
             >
-              {isLoading ? '⏳ AI生成中...' : '🤖 AIで味わいアートを生成'}
+              {isLoading ? 'AI生成中...' : 'AIで味わいアートを生成'}
             </button>
             {!embedding && (
-              <p style={{ fontSize: '11px', color: '#999', margin: '4px 0 0 0' }}>
-                ※ Embeddingが未算出のため生成できません
-              </p>
+              <p className="mt-1 text-xs text-slate-600">※ Embeddingが未算出のため生成できません</p>
             )}
           </div>
         )}
 
         {/* 区切り */}
         {!failedPrompt && (
-          <div style={{ display: 'flex', alignItems: 'center', margin: '14px 0', gap: '8px' }}>
-            <div style={{ flex: 1, height: '1px', background: '#E0E0E0' }} />
-            <span style={{ fontSize: '12px', color: '#999' }}>または</span>
-            <div style={{ flex: 1, height: '1px', background: '#E0E0E0' }} />
+          <div className="my-3.5 flex items-center gap-2">
+            <div className="h-px flex-1 bg-slate-100" />
+            <span className="text-xs text-slate-400">または</span>
+            <div className="h-px flex-1 bg-slate-100" />
           </div>
         )}
 
         {/* 手動アップロード */}
         <div>
-          <p style={{ fontSize: '12px', color: '#888', margin: '0 0 8px 0' }}>
+          <p className="mb-2 text-xs text-slate-500">
             手動アップロード（{UPLOAD_SIZE}×{UPLOAD_SIZE}px にリサイズして保存）
           </p>
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            style={{ display: 'none' }}
+            className="hidden"
             onChange={handleManualUpload}
           />
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={busy}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: busy ? '#BDC3C7' : '#3498DB',
-              color: '#FFF',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: busy ? 'not-allowed' : 'pointer',
-              fontWeight: 'bold',
-              fontSize: '14px',
-            }}
+            className={`w-full rounded-lg border-none p-3 text-sm font-bold text-white ${busy ? 'cursor-not-allowed bg-slate-400' : 'cursor-pointer bg-indigo-400 hover:bg-indigo-500'}`}
           >
             {isUploading ? (
               'アップロード中...'
@@ -444,17 +289,8 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
 
         {/* エラー（プロンプトなし失敗の場合） */}
         {errorMessage && !failedPrompt && (
-          <div
-            style={{
-              marginTop: '12px',
-              padding: '10px',
-              background: '#FCE4D6',
-              color: '#C0392B',
-              borderRadius: '6px',
-              fontSize: '12px',
-            }}
-          >
-            ❌ {errorMessage}
+          <div className="mt-3 rounded-md bg-slate-100 p-2.5 text-xs text-red-800">
+            {errorMessage}
           </div>
         )}
       </div>
@@ -462,7 +298,6 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
       {/* アニメーション定義 */}
       <style>{`
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes slideUp { from { transform: translate(-50%, -44%); opacity: 0 } to { transform: translate(-50%, -50%); opacity: 1 } }
         @keyframes skeleton-shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
       `}</style>
     </>

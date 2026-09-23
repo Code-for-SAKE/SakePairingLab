@@ -8,6 +8,7 @@ import { NetworkResponse, Sake } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import FirestorePager from '../lib/firestorepager';
+import { SakeFlavorImage } from '../components/SakeFlavorImage';
 
 export default function ExplorePage() {
   const pager = useMemo(
@@ -278,7 +279,13 @@ export default function ExplorePage() {
               to={`/sake/${sake.id}`}
               className="block bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:border-indigo-300 transition-colors"
             >
-              <div className="flex justify-between items-start">
+              <div className="flex items-start">
+                <div className="w-20 mr-5">
+                  <SakeFlavorImage
+                    sakeId={sake.id}
+                    sakeName={`${sake.brand} ${sake.bottle}(${sake.brewery})`}
+                  />
+                </div>
                 <div>
                   <p className="text-xs text-slate-500 mb-1">{sake.brewery}</p>
                   <p className="font-bold text-slate-900 text-lg mb-1">{sake.brand}</p>

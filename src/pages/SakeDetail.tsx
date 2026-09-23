@@ -123,9 +123,9 @@ export default function SakeDetail() {
         <div className="w-40 m-auto mb-2">
           <SakeFlavorImage
             sakeId={sake.id}
-            sakeName={`${sake.brewery}-${sake.brand}-${sake.bottle}`}
-            bottle={sake.bottle}
+            sakeName={`${sake.brand} ${sake.bottle}(${sake.brewery})`}
             embedding={sake.embedding?.toArray()}
+            editable={true}
           />
         </div>
         <p className="text-sm font-medium text-slate-500 mb-2">{sake.brewery}</p>
