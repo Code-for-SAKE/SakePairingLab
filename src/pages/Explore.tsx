@@ -1,26 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Loader2, Sparkles, RefreshCw, Compass } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { orderBy } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '../lib/firebase';
 import { NetworkResponse, Sake } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import LoadMoreTrigger from '../components/LoadMoreTrigger';
-import FirestorePager from '../lib/firestorepager';
 import { SakeFlavorImage } from '../components/SakeFlavorImage';
+import { generateQueryEmbedding, hasUserApiKey } from '../lib/gemini';
 
 export default function ExplorePage() {
-  const pager = useMemo(
-    () => new FirestorePager<Sake>('sakes', orderBy('createdAt', 'desc'), 5),
-    [],
-  );
   const { profile } = useAuth();
   const [query, setQuery] = useState('');
-  const [sakes, setSakes] = useState<Sake[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isComposing, setIsComposing] = useState(false);
 
   // Vector Search States
   const [vectorResults, setVectorResults] = useState<Sake[] | null>(null);
@@ -31,29 +24,65 @@ export default function ExplorePage() {
   const [isRebuilding, setIsRebuilding] = useState(false);
   const [rebuildMessage, setRebuildMessage] = useState<string | null>(null);
 
+  const search = async function (query: string, isMounted: boolean) {
+    setIsSearchingVector(true);
+    setVectorSearchError(null);
+    if (hasUserApiKey()) {
+      console.log('search vector', query);
+
+      try {
+        // Try Cloud Function vector search first
+        const functions = getFunctions(app);
+        const searchByVector = httpsCallable<
+          { queryVector: number[]; limit?: number },
+          { success: boolean; results: Sake[] }
+        >(functions, 'searchSakesByVector');
+
+        const vector = await generateQueryEmbedding(query, 1024);
+        const res = await searchByVector({ queryVector: vector, limit: 5 });
+        if (isMounted && res.data.results) {
+          setVectorResults(res.data.results);
+          setIsSearchingVector(false);
+          return;
+        }
+      } catch (cfErr: any) {
+        alert(`ベクトル検索に失敗しました: ${cfErr.message || 'エラーが発生しました'}`);
+        console.warn(
+          'Cloud Functions vector search unavailable, attempting client fallback...',
+          cfErr,
+        );
+        setVectorSearchError(cfErr.message);
+      }
+      setIsSearchingVector(false);
+    } else {
+      console.log('search normal', query);
+      try {
+        // Try Cloud Function vector search first
+        const functions = getFunctions(app);
+        const searchSakesByText = httpsCallable<
+          { queryText: string; limit?: number },
+          { success: boolean; results: Sake[] }
+        >(functions, 'searchSakesByText');
+
+        const res = await searchSakesByText({ queryText: query, limit: 5 });
+        if (isMounted && res.data.results) {
+          setVectorResults(res.data.results);
+          setIsSearchingVector(false);
+          return;
+        }
+      } catch (cfErr: any) {
+        alert(`自然言語検索に失敗しました:${cfErr.message || 'エラーが発生しました'}`);
+        console.warn('Cloud Functions text search unavailable...', cfErr);
+        setVectorSearchError(cfErr.message);
+      }
+      setIsSearchingVector(false);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
+    setLoading(false);
     setError(null);
-
-    const fetchData = async () => {
-      try {
-        const sake = await pager.loadFirst();
-        if (isMounted) {
-          setSakes(sake ?? []);
-          setError(null);
-        }
-      } catch (err) {
-        console.error('Error fetching sake list:', err);
-        setError('データの取得に失敗しました。');
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchData();
 
     return () => {
       isMounted = false;
@@ -69,35 +98,9 @@ export default function ExplorePage() {
       setIsSearchingVector(false);
       return;
     }
-
     let isMounted = true;
-    const timer = setTimeout(async () => {
-      setIsSearchingVector(true);
-      setVectorSearchError(null);
 
-      try {
-        // Try Cloud Function vector search first
-        const functions = getFunctions(app);
-        const searchByVector = httpsCallable<
-          { queryText: string; limit?: number },
-          { success: boolean; results: Sake[] }
-        >(functions, 'searchSakesByVector');
-
-        const res = await searchByVector({ queryText: trimmed, limit: 5 });
-        if (isMounted && res.data.results) {
-          setVectorResults(res.data.results);
-          setIsSearchingVector(false);
-          return;
-        }
-      } catch (cfErr) {
-        console.warn(
-          'Cloud Functions vector search unavailable, attempting client fallback...',
-          cfErr,
-        );
-      }
-
-      setIsSearchingVector(false);
-    }, 2000);
+    const timer = setTimeout(async () => {}, 2000);
 
     return () => {
       isMounted = false;
@@ -105,21 +108,27 @@ export default function ExplorePage() {
     };
   }, [query]);
 
-  const handleLoadMore = () => {
-    setLoadingMore(true);
-    pager
-      .loadNext()
-      .then((data) => {
-        if (data && data.length > 0) {
-          setSakes((prev) => [...prev, ...data]);
-        }
-        setLoadingMore(false);
-      })
-      .catch((err) => {
-        console.error('Error fetching sake list:', err);
-        setError('データの取得に失敗しました。');
-        setLoadingMore(false);
-      });
+  const handleSearch = async () => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setVectorResults(null);
+      setVectorSearchError(null);
+      setIsSearchingVector(false);
+      return;
+    }
+    let isMounted = true;
+
+    await search(trimmed, isMounted);
+
+    return () => {
+      isMounted = false;
+    };
+  };
+
+  const handleKeyDown = (event: { key: string }) => {
+    if (event.key === 'Enter' && !isComposing) {
+      handleSearch();
+    }
   };
 
   const handleRebuildAllEmbeddings = async () => {
@@ -175,7 +184,7 @@ export default function ExplorePage() {
     }
   };
 
-  const displayList = vectorResults && vectorResults.length > 0 ? vectorResults : sakes;
+  const displayList = vectorResults ?? [];
   const isUsingVectorSearch = Boolean(query.trim() && vectorResults && vectorResults.length > 0);
 
   return (
@@ -186,7 +195,7 @@ export default function ExplorePage() {
           <button
             onClick={handleRebuildAllEmbeddings}
             disabled={isRebuilding}
-            className="inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium transition-colors"
+            className="inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer"
             title="管理者用: 全Embedding再生成"
           >
             <RefreshCw
@@ -199,7 +208,7 @@ export default function ExplorePage() {
           <button
             onClick={handleRebuildAllClusters}
             disabled={isRebuilding}
-            className="inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium transition-colors"
+            className="inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer"
             title="管理者用: 全クラスタ再生成"
           >
             <RefreshCw
@@ -233,14 +242,20 @@ export default function ExplorePage() {
           className="block w-full pl-10 pr-24 py-3 border border-slate-200 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-shadow shadow-sm"
           placeholder="銘柄・特徴・味の好みでAI検索... (例: 肉に合うフルーティな酒)"
           value={query}
+          onKeyDown={handleKeyDown}
+          onCompositionStart={() => setIsComposing(true)}
+          onCompositionEnd={() => setIsComposing(false)}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {query && (
+        {query && !isSearchingVector && (
           <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-            <span className="text-xs bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-md flex items-center">
+            <button
+              onClick={handleSearch}
+              className="text-xs bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-md flex items-center cursor-pointer"
+            >
               <Sparkles className="w-3 h-3 mr-1" />
               AI Vector
-            </span>
+            </button>
           </div>
         )}
       </div>
@@ -301,14 +316,11 @@ export default function ExplorePage() {
           ))}
           {displayList.length === 0 && (
             <div className="text-center py-12 text-slate-500">
-              見つかりませんでした。新しく登録しましょう！
+              検索ワードを入力して検索してみましょう。
+              <br />
+              それでも見つからなかったら、新しく登録しましょう！
             </div>
           )}
-          <LoadMoreTrigger
-            onLoadMore={handleLoadMore}
-            hasMore={pager.isLastPage === false}
-            loading={loadingMore}
-          />
         </div>
       )}
     </div>

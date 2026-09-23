@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { generateFlavorImage, generateFlavorImagePrompt } from '../lib/gemini';
+import { generateFlavorImage, generateFlavorImagePrompt, hasUserApiKey } from '../lib/gemini';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Copy, Edit } from 'lucide-react';
 
@@ -72,6 +72,7 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const storage = getStorage();
   const storageRef = ref(storage, `sake_flavor_arts/${sakeId}.png`);
+  const hasApiKey = hasUserApiKey();
 
   // マウント時：Storage に既存画像があるか確認
   useEffect(() => {
@@ -240,8 +241,13 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
             </p>
             <button
               onClick={generateAndSaveImage}
-              disabled={busy || !embedding}
-              className={`mb-1 w-full rounded-lg border-none p-3 text-sm font-bold text-white ${busy || !embedding ? 'cursor-not-allowed bg-slate-400' : 'cursor-pointer bg-indigo-400 hover:bg-indigo-500'}`}
+              disabled={!hasApiKey || busy || !embedding}
+              className={`mb-1 w-full rounded-lg border-none p-3 text-sm font-bold text-white ${!hasApiKey || busy || !embedding ? 'cursor-not-allowed bg-slate-400' : 'cursor-pointer bg-indigo-400 hover:bg-indigo-500'}`}
+              title={
+                !hasApiKey
+                  ? 'マイページからAPIキーを設定すると利用できます。'
+                  : '味わいアート画像を生成します。'
+              }
             >
               {isLoading ? 'AI生成中...' : 'AIで味わいアートを生成'}
             </button>

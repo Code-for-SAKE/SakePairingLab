@@ -23,7 +23,7 @@ import {
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Review } from '../types';
-import { generateTasteComment } from '../lib/gemini';
+import { generateTasteComment, hasUserApiKey } from '../lib/gemini';
 import clsx from 'clsx';
 
 const AROMA_TREE = {
@@ -54,6 +54,7 @@ export default function NewReview() {
     targetPairing?: string;
     targetVessel?: string;
   } | null;
+  const hasApiKey = hasUserApiKey();
 
   const [step, setStep] = useState(1); // 1: Aroma, 2: Taste, 3: Pairing & Post
 
@@ -132,6 +133,7 @@ export default function NewReview() {
   };
 
   const handleGenerateAromaAI = async () => {
+    debugger;
     const selectedWords = [...aromaBroads, ...aromaSpecific];
     if (selectedWords.length === 0) {
       alert('上の選択肢から香りのキーワードを1つ以上選択してください。');
@@ -320,17 +322,23 @@ export default function NewReview() {
                 type="button"
                 onClick={handleGenerateAromaAI}
                 disabled={
-                  generatingAroma || (aromaBroads.length === 0 && aromaSpecific.length === 0)
+                  !hasApiKey ||
+                  generatingAroma ||
+                  (aromaBroads.length === 0 && aromaSpecific.length === 0)
                 }
                 className={clsx(
                   'flex items-center space-x-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-all border shadow-xs',
                   generatingAroma
                     ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                    : aromaBroads.length === 0 && aromaSpecific.length === 0
+                    : !hasApiKey || (aromaBroads.length === 0 && aromaSpecific.length === 0)
                       ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
                       : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 active:scale-95 cursor-pointer',
                 )}
-                title="選択したワードと過去の投稿から50文字程度のコメントを作成します"
+                title={
+                  hasApiKey
+                    ? '選択したワードと過去の投稿から50文字程度のコメントを作成します'
+                    : 'マイページからAPIキーを設定すると利用できます。'
+                }
               >
                 {generatingAroma ? (
                   <>
@@ -430,17 +438,23 @@ export default function NewReview() {
                 type="button"
                 onClick={handleGenerateTasteAI}
                 disabled={
-                  generatingTaste || (tasteBroads.length === 0 && tasteSpecific.length === 0)
+                  !hasApiKey ||
+                  generatingTaste ||
+                  (tasteBroads.length === 0 && tasteSpecific.length === 0)
                 }
                 className={clsx(
                   'flex items-center space-x-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-all border shadow-xs',
                   generatingTaste
                     ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                    : tasteBroads.length === 0 && tasteSpecific.length === 0
+                    : !hasApiKey || (tasteBroads.length === 0 && tasteSpecific.length === 0)
                       ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
                       : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 active:scale-95 cursor-pointer',
                 )}
-                title="選択したワードと過去の投稿から50文字程度のコメントを作成します"
+                title={
+                  hasApiKey
+                    ? '選択したワードと過去の投稿から50文字程度のコメントを作成します'
+                    : 'マイページからAPIキーを設定すると利用できます。'
+                }
               >
                 {generatingTaste ? (
                   <>

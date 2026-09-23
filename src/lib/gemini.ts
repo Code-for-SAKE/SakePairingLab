@@ -8,7 +8,7 @@ import { GoogleGenAI, Modality } from '@google/genai';
  * 3. Browser's secure storage (localStorage) set by the user.
  * If not found, prompts the user to input their API key and stores it securely.
  */
-export async function getApiKey(): Promise<string> {
+function getApiKey(): string {
   // Server or build-time environment variables
   const envKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
   if (envKey) return envKey;
@@ -24,6 +24,23 @@ export async function getApiKey(): Promise<string> {
   if (stored) return stored;
 
   return '';
+}
+
+/**
+ * Allows the user to update their stored Gemini API key.
+ * This can be called from any UI component.
+ */
+export function hasUserApiKey() {
+  // Browser storage (localStorage). Use a namespaced key.
+  const storageKey = 'gemini_api_key';
+  try {
+    const stored = localStorage.getItem(storageKey);
+    if (stored) return true;
+  } catch {
+    return false;
+    // localStorage may be unavailable (e.g., SSR). Ignore.
+  }
+  return false;
 }
 
 /**
@@ -101,13 +118,16 @@ ${pastCommentsText}
 /**
  * Generates text embedding for search query using Gemini text-embedding-004.
  */
-export async function generateQueryEmbedding(text: string): Promise<number[]> {
+export async function generateQueryEmbedding(text: string, dimension: number): Promise<number[]> {
   const apiKey = await resolveApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
   const response = await ai.models.embedContent({
     model: 'models/gemini-embedding-001',
     contents: text,
+    config: {
+      outputDimensionality: dimension, // 👈 Firestoreの上限は2048まで
+    },
   });
 
   const values = (response as any).embedding?.values || response.embeddings?.[0]?.values;

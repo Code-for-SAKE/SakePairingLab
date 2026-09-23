@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
-import { setUserApiKey, getApiKey } from '../lib/gemini';
+import { setUserApiKey, hasUserApiKey } from '../lib/gemini';
 
 const DISPLAY_NAME_MAX_LENGTH = 50;
 
@@ -26,15 +26,7 @@ export default function Settings() {
   }, [profile?.displayName]);
 
   useEffect(() => {
-    let isMounted = true;
-    getApiKey().then((key) => {
-      if (isMounted) {
-        setHasApiKey(key !== '');
-      }
-    });
-    return () => {
-      isMounted = false;
-    };
+    setHasApiKey(hasUserApiKey());
   }, []);
 
   const trimmedName = displayName.trim();

@@ -222,31 +222,57 @@ export const onReviewCreated = onDocumentWritten(
 /**
  * 自然言語日本酒検索
  */
-export const searchSakesByVector = onCall(
+export const searchSakesByVector = onCall(async (request: CallableRequest) => {
+  const { queryVector, limit: searchLimit } = request.data || {};
+  if (!queryVector) {
+    throw new HttpsError('invalid-argument', 'queryVector が指定されていません。');
+  }
+
+  try {
+    const targetLimit =
+      typeof searchLimit === 'number' && searchLimit > 0 && searchLimit < 100 ? searchLimit : 20;
+
+    const vectorQuery = db.collection('sakes').findNearest({
+      vectorField: 'embedding',
+      queryVector: FieldValue.vector(queryVector),
+      limit: targetLimit,
+      distanceMeasure: 'COSINE',
+    });
+
+    const snap = await vectorQuery.get();
+    const results = snap.docs.map((docSnap: any) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+
+    return { success: true, results };
+  } catch (err: any) {
+    console.error('Error during vector search in Cloud Functions:', err);
+    throw new HttpsError('internal', err.message || 'ベクトル検索の実行中にエラーが発生しました。');
+  }
+});
+
+/**
+ * 自然言語日本酒検索
+ */
+export const searchSakesByText = onCall(
   {
     secrets: [geminiApiKey],
+    cors: true,
   },
   async (request: CallableRequest) => {
     const { queryText, limit: searchLimit } = request.data || {};
-    if (!queryText || typeof queryText !== 'string') {
+    if (!queryText || typeof queryText != 'string') {
       throw new HttpsError('invalid-argument', 'queryText が指定されていません。');
     }
 
-    const apiKey = resolveApiKey();
-    if (!apiKey) {
-      throw new HttpsError('failed-precondition', 'GEMINI_API_KEYが設定されていません。');
-    }
-
     try {
-      const ai = new GoogleGenAI({ apiKey });
-      const queryVector = await generateEmbedding(ai, queryText.trim(), 1024);
+      const ai = new GoogleGenAI({ apiKey: resolveApiKey() });
+      const queryVector = await generateEmbedding(ai, queryText, 1024);
 
       const targetLimit =
         typeof searchLimit === 'number' && searchLimit > 0 && searchLimit < 100 ? searchLimit : 20;
 
-      console.log(
-        `Performing vector search for query: "${queryText}" with limit: ${targetLimit} vector values length: ${queryVector.length}`,
-      );
       const vectorQuery = db.collection('sakes').findNearest({
         vectorField: 'embedding',
         queryVector: FieldValue.vector(queryVector),
@@ -262,7 +288,7 @@ export const searchSakesByVector = onCall(
 
       return { success: true, results };
     } catch (err: any) {
-      console.error('Error during vector search in Cloud Functions:', err);
+      console.error('Error during text search in Cloud Functions:', err);
       throw new HttpsError(
         'internal',
         err.message || 'ベクトル検索の実行中にエラーが発生しました。',

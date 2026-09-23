@@ -109,6 +109,15 @@ Google アカウントでログインを有効化している場合、デプロ�
 
 ---
 
+#### (6) シークレットの設定
+
+サーバ側で動作するfunctions内では、ここで設定するAPIキーを利用する。
+Google AI Studioで作成可能。
+
+```
+firebase functions:secrets:set GEMINI_API_KEY
+```
+
 ### 3. Vercel や Netlify へのデプロイ（代替手段）
 
 Firebase Hosting 以外の静的ホスティングを利用することも可能です。
