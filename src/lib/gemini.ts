@@ -44,7 +44,9 @@ export function setUserApiKey(key: string) {
 async function resolveApiKey(): Promise<string> {
   const key = await getApiKey();
   if (!key) {
-    throw new Error('GEMINI_API_KEYが設定されていません。APIキーを入力してください。');
+    throw new Error(
+      'GEMINI_API_KEYが設定されていません。マイページから有効なAPIキーを設定してください。',
+    );
   }
   return key;
 }

@@ -148,6 +148,21 @@ export default function Settings() {
 
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6">
         <h3 className="font-bold text-slate-900 mb-4">Gemini APIキー設定</h3>
+        <p className="text-sm text-slate-500 mb-4 leading-relaxed">
+          投稿時のコメントを自動生成したり、日本酒アート画像を生成するために利用します。
+          <br />
+          <a
+            className="text-indigo-400 hover:text-indigo-600 underline transition-colors"
+            href="https://aistudio.google.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Google AI Studio
+          </a>
+          から簡単に無料のGeminiAPIキーが作成できます。
+          <br />
+          ただし、アート画像をサイトから生成するには有料のAPIキーが必要です。
+        </p>
         <input
           type="password"
           placeholder="APIキーを入力"
