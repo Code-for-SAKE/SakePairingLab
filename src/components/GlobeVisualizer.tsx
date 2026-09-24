@@ -29,6 +29,13 @@ interface SakeStarData {
   targetColor: THREE.Color;
 }
 
+export interface DimensionStats {
+  mean: number;
+  q25: number;
+  q75: number;
+  iqr: number;
+}
+
 const GLOBE_RADIUS = 100;
 const ANIMATION_SPEED = 0.05; // 星の移動スピード
 
@@ -53,37 +60,50 @@ function convertMdsToSphere(mdsResult: Matrix, radius: number = GLOBE_RADIUS): T
   return spherePositions;
 }
 
-// --- 2. 単一銘柄の全次元ベクトルを球表面全体に描画するヒートマップコンポーネント ---
+// --- 2. 単一銘柄の全次元ベクトルを、平均・分散(25%/75%)からの差に応じた「半径」で表現する3Dコンポーネント ---
 const SakeVectorHeatmap: React.FC<{
   vector: number[];
-  dimensionPositions: THREE.Vector3[];
-}> = ({ vector, dimensionPositions }) => {
+  dimensionUnitVectors: THREE.Vector3[];
+  dimensionStatsList: DimensionStats[];
+}> = ({ vector, dimensionUnitVectors, dimensionStatsList }) => {
   const instancedMeshRef = useRef<THREE.InstancedMesh>(null);
   const tempObject = useMemo(() => new THREE.Object3D(), []);
   const tempColor = useMemo(() => new THREE.Color(), []);
 
   useEffect(() => {
-    if (!instancedMeshRef.current || dimensionPositions.length === 0) return;
+    if (!instancedMeshRef.current || dimensionUnitVectors.length === 0) return;
 
-    let minVal = Infinity;
-    let maxVal = -Infinity;
-    for (let i = 0; i < vector.length; i++) {
-      const v = vector[i] ?? 0;
-      if (v < minVal) minVal = v;
-      if (v > maxVal) maxVal = v;
-    }
+    dimensionUnitVectors.forEach((unitVec, i) => {
+      const val = vector[i] ?? 0;
+      const stats = dimensionStatsList[i];
 
-    dimensionPositions.forEach((pos, i) => {
-      tempObject.position.copy(pos);
+      let radius = GLOBE_RADIUS;
+      let ratio = 0; // (val - mean) / iqr (四分位範囲単位での位置)
+
+      if (stats && stats.iqr > 0) {
+        // (val - mean) / iqr
+        // 平均(mean)のとき ratio = 0  -> 半径 GLOBE_RADIUS
+        // 25%点(q25)のとき ratio = -0.5 -> 半径 0.5 * GLOBE_RADIUS (半径1/2)
+        // 75%点(q75)のとき ratio = +0.5 -> 半径 1.5 * GLOBE_RADIUS (半径3/2)
+        ratio = (val - stats.mean) / stats.iqr;
+        radius = GLOBE_RADIUS * (1 + ratio);
+      }
+
+      // 可視化のための表示領域クランプ (0.05 * R 〜 2.5 * R)
+      const clampedRadius = Math.max(GLOBE_RADIUS * 0.05, Math.min(GLOBE_RADIUS * 2.5, radius));
+
+      // 1. 半径に応じた3D位置の指定 (単位ベクトル × 計算された半径)
+      tempObject.position.copy(unitVec).multiplyScalar(clampedRadius);
+
+      // 2. 半径に応じてピクセルの大きさを少しスケーリング（突出している次元をより強調）
+      const scale = Math.max(0.6, Math.min(2.5, (clampedRadius / GLOBE_RADIUS) * 1.2));
+      tempObject.scale.set(scale, scale, scale);
+
       tempObject.updateMatrix();
       instancedMeshRef.current!.setMatrixAt(i, tempObject.matrix);
 
-      const val = vector[i] ?? 0;
-
-      const t = ((val - minVal) / (maxVal - minVal || 1)) * 2 - 1;
-      tempColor.set(jetMap(t).hex());
-
-      console.log(val, t, jetMap(t).hex());
+      // 3. 発色：
+      tempColor.set(jetMap(-ratio).hex());
 
       instancedMeshRef.current!.setColorAt(i, tempColor);
     });
@@ -92,11 +112,14 @@ const SakeVectorHeatmap: React.FC<{
     if (instancedMeshRef.current.instanceColor) {
       instancedMeshRef.current.instanceColor.needsUpdate = true;
     }
-  }, [vector, dimensionPositions, tempObject, tempColor]);
+  }, [vector, dimensionUnitVectors, dimensionStatsList, tempObject, tempColor]);
 
   return (
-    <instancedMesh ref={instancedMeshRef} args={[undefined, undefined, dimensionPositions.length]}>
-      <boxGeometry args={[1.8, 1.8, 1.8]} />
+    <instancedMesh
+      ref={instancedMeshRef}
+      args={[undefined, undefined, dimensionUnitVectors.length]}
+    >
+      <boxGeometry args={[1.6, 1.6, 1.6]} />
       <meshBasicMaterial />
     </instancedMesh>
   );
@@ -209,25 +232,22 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
   const [selectedSakeId, setSelectedSakeId] = useState<number | null>(null);
   const [query, setQuery] = useState<string>('');
 
-  // 各次元 (Vector の各要素) 同士の相関行列を作成し、球面上における相関に基く配置を計算
+  // 1. 各次元 (Vector の各要素) 同士の相関行列を作成し、球面上における基準の相関配置（方向）を計算
   const dimensionPositions = useMemo(() => {
     if (!props.vectors || props.vectors.length === 0) return [];
     const dimCount = props.vectors[0].vector.length;
     if (dimCount === 0) return [];
 
-    // 各次元 (0 ~ dimCount-1) における各日本酒の値を並べたベクトル
     const dimVectors: number[][] = [];
     for (let d = 0; d < dimCount; d++) {
       dimVectors.push(props.vectors.map((v) => v.vector[d] ?? 0));
     }
 
     if (props.vectors.length >= 2) {
-      // 銘柄同士の各次元相関（コサイン距離行列）を計算
       const dimDistanceMatrix = new Matrix(createCosineDistanceMatrix(dimVectors));
       const mdsResult = classicalMDS(dimDistanceMatrix, 3);
       return convertMdsToSphere(mdsResult, GLOBE_RADIUS);
     } else {
-      // 銘柄数が2未満の場合は球面上に均等分散配置
       const spherePositions: THREE.Vector3[] = [];
       const phi = Math.PI * (3 - Math.sqrt(5));
       for (let i = 0; i < dimCount; i++) {
@@ -240,6 +260,56 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
       }
       return spherePositions;
     }
+  }, [props.vectors]);
+
+  // 次元の単位方向ベクトル (長さ1に正規化)
+  const dimensionUnitVectors = useMemo((): THREE.Vector3[] => {
+    return dimensionPositions.map((pos) => pos.clone().normalize());
+  }, [dimensionPositions]);
+
+  // 2. 日本酒全体における、各次元の平均値・25%点(q25)・75%点(q75)・IQRの計算
+  const dimensionStatsList = useMemo((): DimensionStats[] => {
+    if (!props.vectors || props.vectors.length === 0) return [];
+    const dimCount = props.vectors[0].vector.length;
+    const statsList: DimensionStats[] = [];
+
+    for (let d = 0; d < dimCount; d++) {
+      const values = props.vectors.map((v) => v.vector[d] ?? 0).sort((a, b) => a - b);
+      const n = values.length;
+
+      const sum = values.reduce((acc, val) => acc + val, 0);
+      const mean = sum / n;
+
+      let q25 = mean;
+      let q75 = mean;
+
+      if (n >= 2) {
+        const idx25 = (n - 1) * 0.25;
+        const base25 = Math.floor(idx25);
+        const rest25 = idx25 - base25;
+        q25 =
+          values[base25] +
+          (values[base25 + 1] !== undefined ? rest25 * (values[base25 + 1] - values[base25]) : 0);
+
+        const idx75 = (n - 1) * 0.75;
+        const base75 = Math.floor(idx75);
+        const rest75 = idx75 - base75;
+        q75 =
+          values[base75] +
+          (values[base75 + 1] !== undefined ? rest75 * (values[base75 + 1] - values[base75]) : 0);
+      }
+
+      let iqr = q75 - q25;
+      if (iqr <= 0.00001) {
+        const variance = values.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / n;
+        const std = Math.sqrt(variance);
+        iqr = std > 0 ? std * 1.349 : 1.0;
+      }
+
+      statsList.push({ mean, q25, q75, iqr });
+    }
+
+    return statsList;
   }, [props.vectors]);
 
   // 現在選択されている銘柄の星データ
@@ -270,7 +340,7 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
     setSakeStars(
       sakeStars.map((star, i) => {
         const colorScale = ((color[i] - minSimScale) / (maxSimScale - minSimScale)) * 2 - 1;
-        star.targetColor = new THREE.Color().set(jetMap(colorScale).hex());
+        star.targetColor = new THREE.Color().set(jetMap(-colorScale).hex());
         star.targetPos = vectors[i];
         star.similarity = color[i];
         return star;
@@ -376,20 +446,35 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
         style={{ height: '70vh', position: 'relative', backgroundColor: 'black' }}
       >
         {/* 3D レンダリング空間 (Canvas) */}
-        <Canvas camera={{ position: 30, fov: 55 }}>
+        <Canvas camera={{ position: 35, fov: 55 }}>
           <ambientLight intensity={0.9} />
           <directionalLight position={[1, 1, 1]} intensity={0.8} />
 
-          {/* 土台となる地球の球体 */}
+          {/* 基準となる平均球面 (半径 = GLOBE_RADIUS) */}
           <Sphere args={[GLOBE_RADIUS, 32, 32]}>
-            <meshStandardMaterial color="#202028" wireframe transparent opacity={0.6} />
+            <meshStandardMaterial color="#30303d" wireframe transparent opacity={0.25} />
           </Sphere>
 
-          {/* 個別表示モード時の全次元ベクトルヒートマップ */}
+          {/* 個別表示モード時の補助ガイド球面（25%面 = 1/2, 75%面 = 3/2） */}
+          {!isGloval && (
+            <>
+              {/* 25%分散 (Q1) 面: 半径 0.5 * GLOBE_RADIUS */}
+              <Sphere args={[GLOBE_RADIUS * 0.5, 24, 24]}>
+                <meshBasicMaterial color="#3388ff" wireframe transparent opacity={0.25} />
+              </Sphere>
+              {/* 75%分散 (Q3) 面: 半径 1.5 * GLOBE_RADIUS */}
+              <Sphere args={[GLOBE_RADIUS * 1.5, 32, 32]}>
+                <meshBasicMaterial color="#ff3366" wireframe transparent opacity={0.25} />
+              </Sphere>
+            </>
+          )}
+
+          {/* 個別表示モード時の各次元の半径プロット */}
           {!isGloval && selectedStar && (
             <SakeVectorHeatmap
               vector={selectedStar.vector}
-              dimensionPositions={dimensionPositions}
+              dimensionUnitVectors={dimensionUnitVectors}
+              dimensionStatsList={dimensionStatsList}
             />
           )}
 
@@ -412,12 +497,12 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
         {/* HTML / React によるUIレイヤー */}
         <div
           id="ui-container"
-          className="absolute bottom-4 left-4 text-white bg-slate-900/80 p-4 rounded-xl backdrop-blur-sm max-w-md"
+          className="absolute bottom-4 left-4 text-white bg-slate-900/85 p-4 rounded-xl backdrop-blur-md max-w-md border border-slate-700/50"
         >
           <div className="flex items-center justify-between gap-2 mb-1">
             <h3 className="font-bold text-lg">
               {!isGloval && selectedStar
-                ? `🍶 ${selectedStar.name} のベクトル分布`
+                ? `🍶 ${selectedStar.name} の相対分布`
                 : '🍶 日本酒ペアリング球'}
             </h3>
             <span className="text-xs text-slate-400">
@@ -425,10 +510,10 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
             </span>
           </div>
 
-          <p className="text-xs text-slate-300 mb-2">
+          <p className="text-xs text-slate-300 mb-2 leading-relaxed">
             {!isGloval && selectedStar
-              ? '相関のある次元同士が近く並ぶよう球表面に配置し、この銘柄の各次元の反応強度を色で表現しています。'
-              : '銘柄ラベルをクリックすると、その日本酒の全次元ベクトルを球表面全体に表示します。'}
+              ? '全銘柄の平均値を球面上(半径1.0)とし、下位25%点を半径1/2、上位75%点を半径3/2として個別の数値を半径方向に表示しています。'
+              : '銘柄ラベルをクリックすると、全体平均・分散に対するこの銘柄の各次元の偏りを立体的な半径として確認できます。'}
           </p>
 
           <div id="legend" className="flex flex-wrap gap-2 text-xs">
@@ -436,15 +521,15 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
               <>
                 <div className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded-full inline-block bg-red-500"></span>
-                  <span>高反応(正)</span>
+                  <span>75%以上(突出 / 外球)</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-full inline-block bg-slate-400"></span>
+                  <span>平均付近(基準球)</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded-full inline-block bg-blue-500"></span>
-                  <span>逆反応(負)</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-3 h-3 rounded-full inline-block bg-slate-600"></span>
-                  <span>無反応</span>
+                  <span>25%以下(凹み / 内球)</span>
                 </div>
               </>
             ) : (
