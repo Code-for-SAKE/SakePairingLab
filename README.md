@@ -8,6 +8,12 @@
 
 ---
 
+## ✨ 機能一覧
+
+実装されている機能の詳細や画面構成、AI・可視化機能については、[FEATURES.md](./FEATURES.md) をご覧ください。
+
+---
+
 ## 🛠 技術スタック
 
 - **フロントエンド**: React 19, TypeScript, Vite 6, Tailwind CSS 4
