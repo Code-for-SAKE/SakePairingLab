@@ -272,3 +272,74 @@ ${negText}
 
   return (response.text || '').trim();
 }
+
+/**
+ * ユーザーの志向ベクトル (userPreferenceVector: 世間基準との高次元差分平均) を Gemini で直接分析し、
+ * ユーザー独自の感覚・好みの傾向レポートを生成します。
+ */
+export async function generateUserTasteAnalysis({
+  userName,
+  reviewCount,
+  userPreferenceVector,
+  sampleReviews,
+}: {
+  userName: string;
+  reviewCount: number;
+  userPreferenceVector: number[];
+  sampleReviews: string[];
+}): Promise<string> {
+  const apiKey = await resolveApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  // 1. userPreferenceVector から偏りが大きい次元 (正上位・負上位) を抽出
+  let vectorStatsText = '';
+  if (userPreferenceVector && userPreferenceVector.length > 0) {
+    const indexed = userPreferenceVector.map((val, idx) => ({ dimIndex: idx, value: val }));
+    const sortedPos = [...indexed].sort((a, b) => b.value - a.value).slice(0, 5);
+    const sortedNeg = [...indexed].sort((a, b) => a.value - b.value).slice(0, 5);
+
+    const posStr = sortedPos
+      .map((d) => `- 次元 #${d.dimIndex}: 偏差=+${d.value.toFixed(4)}`)
+      .join('\n');
+    const negStr = sortedNeg
+      .map((d) => `- 次元 #${d.dimIndex}: 偏差=${d.value.toFixed(4)}`)
+      .join('\n');
+
+    vectorStatsText = `
+■ ユーザー志向ベクトル (全レビュー差分平均ベクトル: ${userPreferenceVector.length}次元) の主要偏差:
+【正の偏りが強い主要次元 (好み・意識が強い要素)】:
+${posStr}
+
+【負の偏りが強い主要次元 (控えめ・意識が低い要素)】:
+${negStr}
+`.trim();
+  } else {
+    vectorStatsText = '（志向ベクトル未算出）';
+  }
+
+  const reviewText = sampleReviews.length > 0 ? sampleReviews.join('\n') : '（過去コメントなし）';
+
+  const prompt = `
+あなたは味覚心理学と高次元データサイエンスに精通した日本酒ソムリエAI分析官です。
+ユーザー「${userName}」が投稿した ${reviewCount} 件のレビューから導出された「ユーザー志向ベクトル (高次元空間における世間一般評価との差分平均ベクトル)」をダイレクトに分析しました。
+
+【分析されたユーザー志向ベクトルデータ】
+${vectorStatsText}
+
+【ユーザーの直近レビューコメント】
+${reviewText}
+
+【出力ルール】
+1. 「世間一般の標準的な日本酒評価に対して、このユーザーが高次元ベクトル的にどのような特徴や味わいを強く感じ取り、どのようなテイストを好む傾向があるか」を解釈して説明してください。
+2. 「どのような特徴の日本酒やペアリング（おつまみ・温度帯など）がこのユーザーに最もマッチするか」のアドバイスを含めてください。
+3. 250文字〜350文字程度で、Markdown形式（見出し・箇条書きなど）で読みやすくまとめてください。
+4. 前置き（「承知しました」等）は除き、分析レポート本文のみを出力してください。
+`.trim();
+
+  const response = await ai.models.generateContent({
+    model: 'models/gemini-3.6-flash',
+    contents: prompt,
+  });
+
+  return (response.text || '').trim();
+}

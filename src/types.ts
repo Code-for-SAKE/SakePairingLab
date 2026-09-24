@@ -43,6 +43,9 @@ export type Review = {
   createdAt: any;
   likesCount: number;
   questId?: string;
+  embedding?: VectorValue;
+  sake?: Sake; // 表示のため
+  user?: UserProfile; // 表示のため
 };
 
 export type Quest = {
