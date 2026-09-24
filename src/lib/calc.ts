@@ -60,24 +60,39 @@ export function createCosineDistanceMatrix(data: number[][]): number[][] {
 export function classicalMDS(distanceMatrix: Matrix, dimensions: number = 3): Matrix {
   const n = distanceMatrix.rows;
 
-  // ステップ 1: 距離の2乗行列 A の作成
-  // A_ij = -0.5 * d_ij^2
-  const A = new Matrix(n, n);
+  // ステップ 1 & 2: ダブルセンタリング公式により内積行列（Gram行列）B を O(n^2) で直接計算
+  // B_ij = -0.5 * (d_ij^2 - rowMean_i - rowMean_j + totalMean)
+  // 行列積 H * A * H (O(n^3)) を排除し、余分な一時行列の生成も不要にします。
+  const d2RowSums = new Float64Array(n);
+
   for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
+    for (let j = i + 1; j < n; j++) {
       const d = distanceMatrix.get(i, j);
-      A.set(i, j, -0.5 * Math.pow(d, 2));
+      const d2 = d * d;
+      d2RowSums[i] += d2;
+      d2RowSums[j] += d2;
     }
   }
 
-  // ステップ 2: 中心化行列 H の作成
-  // H = I - (1/n) * J  （Jはすべて1の行列）
-  const I = Matrix.eye(n);
-  const J = Matrix.ones(n, n);
-  const H = I.sub(J.div(n));
+  const d2RowMeans = new Float64Array(n);
+  let totalD2Sum = 0;
+  for (let i = 0; i < n; i++) {
+    d2RowMeans[i] = d2RowSums[i] / n;
+    totalD2Sum += d2RowSums[i];
+  }
+  const d2TotalMean = totalD2Sum / (n * n);
 
-  // 内積行列（Gram行列） B の計算: B = H * A * H
-  const B = H.mmul(A).mmul(H);
+  const B = new Matrix(n, n);
+  for (let i = 0; i < n; i++) {
+    const meanI = d2RowMeans[i];
+    for (let j = i; j < n; j++) {
+      const d = distanceMatrix.get(i, j);
+      const d2 = d * d;
+      const b_ij = -0.5 * (d2 - meanI - d2RowMeans[j] + d2TotalMean);
+      B.set(i, j, b_ij);
+      B.set(j, i, b_ij);
+    }
+  }
 
   // ステップ 3: 固有値分解 (B = V * L * V^T)
   const evd = new EigenvalueDecomposition(B);
