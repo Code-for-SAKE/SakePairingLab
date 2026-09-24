@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { GlobeVisualizer } from '../components/GlobeVisualizer';
 import VectorMaker from '../components/VectorMaker';
 import { TextVector } from '../dummyTypes';
+import { SakeVectorGlobe } from '../components/SakeVectorGlobe';
 
 export default function ExploreSake() {
   const [vectors, setVectors] = useState<TextVector[]>([]);
