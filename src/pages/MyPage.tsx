@@ -218,7 +218,7 @@ export default function MyPage() {
           </div>
         )}
       </div>
-      <div className="h-4">
+      <div>
         {reviews.length === 0 ? (
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 text-center text-slate-500 py-12">
             まだレビューがありません。最初のレビューを書きましょう！
