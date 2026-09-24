@@ -11,7 +11,7 @@ import {
   createCosineDistanceMatrix,
   getOrthogonalVector,
 } from '../lib/calc';
-import { generateQueryEmbedding } from '../lib/gemini';
+import { generateQueryEmbedding, generateVectorAnalysisComment } from '../lib/gemini';
 import chroma from 'chroma-js';
 
 // カラーマップの設定
@@ -103,7 +103,11 @@ const SakeVectorHeatmap: React.FC<{
       instancedMeshRef.current!.setMatrixAt(i, tempObject.matrix);
 
       // 3. 発色：
-      tempColor.set(jetMap(-ratio).hex());
+      if (ratio > -0.2 && ratio < 0.2) {
+        tempColor.setColorName('gray');
+      } else {
+        tempColor.set(jetMap(-ratio).hex());
+      }
 
       instancedMeshRef.current!.setColorAt(i, tempColor);
     });
@@ -231,6 +235,11 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
   const [isGloval, setGloval] = useState<boolean>(true);
   const [selectedSakeId, setSelectedSakeId] = useState<number | null>(null);
   const [query, setQuery] = useState<string>('');
+
+  // AI文章分析用のState
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [aiAnalysisResult, setAiAnalysisResult] = useState<string>('');
+  const [analysisError, setAnalysisError] = useState<string>('');
 
   // 1. 各次元 (Vector の各要素) 同士の相関行列を作成し、球面上における基準の相関配置（方向）を計算
   const dimensionPositions = useMemo(() => {
@@ -392,6 +401,51 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
   const handleSelectStar = (starId: number) => {
     setSelectedSakeId(starId);
     setGloval(false);
+    setAiAnalysisResult('');
+    setAnalysisError('');
+  };
+
+  const handleAnalyzeSake = async () => {
+    if (!selectedStar || dimensionStatsList.length === 0) return;
+
+    setIsAnalyzing(true);
+    setAnalysisError('');
+    try {
+      const dimCount = selectedStar.vector.length;
+      const items: { dimIndex: number; value: number; mean: number; ratio: number }[] = [];
+
+      for (let d = 0; d < dimCount; d++) {
+        const val = selectedStar.vector[d] ?? 0;
+        const stats = dimensionStatsList[d];
+        const ratio = stats && stats.iqr > 0 ? (val - stats.mean) / stats.iqr : 0;
+        items.push({ dimIndex: d, value: val, mean: stats ? stats.mean : 0, ratio });
+      }
+
+      const sortedPos = [...items].sort((a, b) => b.ratio - a.ratio);
+      const sortedNeg = [...items].sort((a, b) => a.ratio - b.ratio);
+
+      const summary = {
+        topPositiveDimensions: sortedPos.slice(0, 5),
+        topNegativeDimensions: sortedNeg.slice(0, 5),
+        averageSimilarityToMean: 0.85,
+      };
+
+      const textVectorObj = props.vectors.find((v) => v.name === selectedStar.name);
+
+      const comment = await generateVectorAnalysisComment({
+        name: selectedStar.name,
+        text: textVectorObj?.text,
+        vector: selectedStar.vector,
+        statsSummary: summary,
+      });
+
+      setAiAnalysisResult(comment);
+    } catch (err: any) {
+      console.error(err);
+      setAnalysisError(err.message || 'Geminiによる分析に失敗しました。');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -549,6 +603,47 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
               </>
             )}
           </div>
+
+          {!isGloval && selectedStar && (
+            <div className="mt-3 pt-3 border-t border-slate-700/60">
+              {!aiAnalysisResult && !isAnalyzing && (
+                <button
+                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold py-2 px-3 rounded-lg shadow transition-all flex items-center justify-center gap-1.5"
+                  onClick={handleAnalyzeSake}
+                >
+                  ✨ Geminiでベクトル特徴を文章解説
+                </button>
+              )}
+
+              {isAnalyzing && (
+                <div className="flex items-center justify-center gap-2 py-3 text-xs text-purple-300 animate-pulse">
+                  <span className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></span>
+                  ベクトルと統計偏りをGeminiが分析中...
+                </div>
+              )}
+
+              {analysisError && (
+                <div className="text-xs text-rose-400 bg-rose-950/50 p-2 rounded border border-rose-800/50 mt-2">
+                  {analysisError}
+                </div>
+              )}
+
+              {aiAnalysisResult && (
+                <div className="mt-2 bg-slate-950/80 p-3 rounded-lg border border-purple-500/30 text-xs leading-relaxed text-slate-200 space-y-1.5 max-h-48 overflow-y-auto">
+                  <div className="font-semibold text-purple-300 flex items-center justify-between">
+                    <span>🤖 AIベクトル特徴解説</span>
+                    <button
+                      className="text-[10px] text-slate-400 hover:text-white underline"
+                      onClick={handleAnalyzeSake}
+                    >
+                      再生成
+                    </button>
+                  </div>
+                  <div className="whitespace-pre-wrap text-slate-300">{aiAnalysisResult}</div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

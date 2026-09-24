@@ -206,3 +206,69 @@ export async function generateFlavorImage(
   const mimeType = imagePart.inlineData.mimeType ?? 'image/png'; // "image/png" など
   return { base64Data, mimeType };
 }
+
+/**
+ * 日本酒のベクトルデータおよび全体平均・分散との差を分析し、AI解説文章を生成します。
+ */
+export async function generateVectorAnalysisComment({
+  name,
+  text,
+  vector,
+  statsSummary,
+}: {
+  name: string;
+  text?: string;
+  vector: number[];
+  statsSummary: {
+    topPositiveDimensions: { dimIndex: number; value: number; mean: number; ratio: number }[];
+    topNegativeDimensions: { dimIndex: number; value: number; mean: number; ratio: number }[];
+    averageSimilarityToMean: number;
+  };
+}): Promise<string> {
+  const apiKey = await resolveApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const posText = statsSummary.topPositiveDimensions
+    .map(
+      (d) =>
+        `- 次元 #${d.dimIndex}: 値=${d.value.toFixed(3)}, 平均=${d.mean.toFixed(3)}, 偏差倍率=+${d.ratio.toFixed(2)}`,
+    )
+    .join('\n');
+
+  const negText = statsSummary.topNegativeDimensions
+    .map(
+      (d) =>
+        `- 次元 #${d.dimIndex}: 値=${d.value.toFixed(3)}, 平均=${d.mean.toFixed(3)}, 偏差倍率=${d.ratio.toFixed(2)}`,
+    )
+    .join('\n');
+
+  const prompt = `
+あなたは先進的なデータサイエンスと日本酒ペアリングの専門ソムリエです。
+対象の銘柄「${name}」の多次元ベクトル表現と、データベース内の日本酒全体の「平均ベクトル」「分散・四分位数」からの偏差統計データを分析し、この日本酒の特徴・風味・相性の良い料理の傾向について分かりやすく解説してください。
+
+【銘柄名】
+${name} ${text ? `(元メモ・説明: ${text})` : ''}
+
+【全体平均・分散との比較偏差データ】
+■ 他の日本酒より特に大きく突出・活性化している特徴（上位正偏差次元）:
+${posText}
+
+■ 他の日本酒と比べて顕著に低い・抑制されている特徴（上位負偏差次元）:
+${negText}
+
+■ 全体平均ベクトルに対する類似度スコア: ${statsSummary.averageSimilarityToMean.toFixed(3)}
+
+【出力形式ルール】
+1. この日本酒が全体の中でどのような独自のフレーバープロファイルや特徴を持っているかをデータ偏差に基づいて分かりやすく解釈・説明してください。
+2. 相性の良い料理やペアリング（例：酸味・旨味・香りのバランスに応じたおすすめのおつまみ等）のアドバイスを含めてください。
+3. 200文字〜350文字程度で、Markdown形式の見易い段落・箇条書きで構成してください。
+4. 前置き（「承知しました」等）は含めず、レポート本文のみを出力してください。
+`.trim();
+
+  const response = await ai.models.generateContent({
+    model: 'models/gemini-3.6-flash',
+    contents: prompt,
+  });
+
+  return (response.text || '').trim();
+}
