@@ -11,7 +11,7 @@ import Header from './components/Header';
 
 const HomePage = lazy(() => import('./pages/Home'));
 const ExplorePage = lazy(() => import('./pages/Explore'));
-const ExploreSake = lazy(() => import('./pages/ExploreSake'));
+const ExploreSake = lazy(() => import('./pages/ExploreSake2'));
 const QuestPage = lazy(() => import('./pages/Quest'));
 const MyPage = lazy(() => import('./pages/MyPage'));
 const SakeDetail = lazy(() => import('./pages/SakeDetail'));
