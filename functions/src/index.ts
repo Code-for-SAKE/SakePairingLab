@@ -163,6 +163,30 @@ export const onReviewCreated = onDocumentWritten(
     const reviewData = reviewSnap.data() as Review | undefined;
     if (!reviewData) return;
 
+    const afterSnap = event.data?.after;
+    if (!afterSnap || !afterSnap.exists) {
+      return;
+    }
+
+    const beforeData = event.data?.before?.data();
+
+    // Prevent infinite loop if update was only embedding/updatedAt
+    if (beforeData) {
+      const contentChanged =
+        beforeData.aroma !== reviewData?.aroma ||
+        beforeData.comment !== reviewData?.comment ||
+        beforeData.pairing !== reviewData?.pairing ||
+        beforeData.rating !== reviewData?.rating ||
+        beforeData.taste !== reviewData?.taste ||
+        beforeData.temperature !== reviewData?.temperature ||
+        beforeData.userId !== reviewData?.userId ||
+        beforeData.vessel !== reviewData?.vessel;
+
+      if (!contentChanged && reviewData?.embedding) {
+        return;
+      }
+    }
+
     // 1. sakesコレクションから、お酒のembeddingを取得する
     const sakeSnap = await db.collection('sakes').doc(reviewData.sakeId).get();
     const sakeData = sakeSnap.data() as Sake | undefined;
@@ -320,7 +344,7 @@ async function rebuildSakeEmbedding(docSnap: DocumentSnapshot): Promise<boolean>
         const reviewData = reviewDoc.data();
         if (reviewData.embedding) {
           // 後半の1024次元（result成分）を切り出す
-          const resultPart = reviewData.embedding.slice(1024, 2048);
+          const resultPart = reviewData.embedding.toArray().slice(1024, 2048);
           resultEmbeddings.push(resultPart);
         }
       });
