@@ -4,16 +4,21 @@ import { AccordionItem } from './AccordionItem';
 import { TextVector } from '../dummyTypes';
 
 interface VectorMakerProps {
+  initialVectors?: TextVector[];
   onDataChange?: (data: TextVector[]) => void; // string型の引数を受け取り、戻り値はない関数
 }
 
-export default function VectorMaker({ onDataChange }: VectorMakerProps) {
+export default function VectorMaker({ initialVectors = [], onDataChange }: VectorMakerProps) {
   const [name, setName] = useState('');
   const [query, setQuery] = useState('');
-  const [vectors, setVectors] = useState<TextVector[]>([]);
+  const [vectors, setVectors] = useState<TextVector[]>(initialVectors);
   const [jsonData, setJsonData] = useState(null);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setVectors(initialVectors);
+  }, [initialVectors]);
 
   const handleFileChange = (event: any) => {
     const file = event.target.files[0];
