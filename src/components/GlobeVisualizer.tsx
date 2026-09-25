@@ -123,7 +123,7 @@ const SakeVectorHeatmap: React.FC<{
       ref={instancedMeshRef}
       args={[undefined, undefined, dimensionUnitVectors.length]}
     >
-      <boxGeometry args={[1.6, 1.6, 1.6]} />
+      <sphereGeometry args={[0.9, 8, 6]} />
       <meshBasicMaterial />
     </instancedMesh>
   );
@@ -232,6 +232,8 @@ interface GlobeVisualizerProps {
 // --- 4. メインの地球儀コンポーネント ---
 export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisualizerProps) => {
   const [sakeStars, setSakeStars] = useState<SakeStarData[]>([]);
+  const [displayVectors, setDisplayVectors] = useState<TextVector[]>([]);
+  const [isProcessingVectors, setIsProcessingVectors] = useState(false);
   const [isGloval, setGloval] = useState<boolean>(true);
   const [selectedSakeId, setSelectedSakeId] = useState<number | null>(null);
   const [query, setQuery] = useState<string>('');
@@ -241,18 +243,34 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
   const [aiAnalysisResult, setAiAnalysisResult] = useState<string>('');
   const [analysisError, setAnalysisError] = useState<string>('');
 
+  const isLoading = isProcessingVectors || displayVectors !== props.vectors;
+
+  useEffect(() => {
+    setIsProcessingVectors(true);
+
+    let timeoutId: number | undefined;
+    const frameId = requestAnimationFrame(() => {
+      timeoutId = window.setTimeout(() => setDisplayVectors(props.vectors), 0);
+    });
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, [props.vectors]);
+
   // 1. 各次元 (Vector の各要素) 同士の相関行列を作成し、球面上における基準の相関配置（方向）を計算
   const dimensionPositions = useMemo(() => {
-    if (!props.vectors || props.vectors.length === 0) return [];
-    const dimCount = props.vectors[0].vector.length;
+    if (displayVectors.length === 0) return [];
+    const dimCount = displayVectors[0].vector.length;
     if (dimCount === 0) return [];
 
     const dimVectors: number[][] = [];
     for (let d = 0; d < dimCount; d++) {
-      dimVectors.push(props.vectors.map((v) => v.vector[d] ?? 0));
+      dimVectors.push(displayVectors.map((v) => v.vector[d] ?? 0));
     }
 
-    if (props.vectors.length >= 2) {
+    if (displayVectors.length >= 2) {
       const dimDistanceMatrix = new Matrix(createCosineDistanceMatrix(dimVectors));
       const mdsResult = classicalMDS(dimDistanceMatrix, 3);
       return convertMdsToSphere(mdsResult, GLOBE_RADIUS);
@@ -269,7 +287,7 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
       }
       return spherePositions;
     }
-  }, [props.vectors]);
+  }, [displayVectors]);
 
   // 次元の単位方向ベクトル (長さ1に正規化)
   const dimensionUnitVectors = useMemo((): THREE.Vector3[] => {
@@ -278,12 +296,12 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
 
   // 2. 日本酒全体における、各次元の平均値・25%点(q25)・75%点(q75)・IQRの計算
   const dimensionStatsList = useMemo((): DimensionStats[] => {
-    if (!props.vectors || props.vectors.length === 0) return [];
-    const dimCount = props.vectors[0].vector.length;
+    if (displayVectors.length === 0) return [];
+    const dimCount = displayVectors[0].vector.length;
     const statsList: DimensionStats[] = [];
 
     for (let d = 0; d < dimCount; d++) {
-      const values = props.vectors.map((v) => v.vector[d] ?? 0).sort((a, b) => a - b);
+      const values = displayVectors.map((v) => v.vector[d] ?? 0).sort((a, b) => a - b);
       const n = values.length;
 
       const sum = values.reduce((acc, val) => acc + val, 0);
@@ -319,7 +337,7 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
     }
 
     return statsList;
-  }, [props.vectors]);
+  }, [displayVectors]);
 
   // 現在選択されている銘柄の星データ
   const selectedStar = useMemo(() => {
@@ -358,19 +376,22 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
   };
 
   useEffect(() => {
-    if (!props.vectors || props.vectors.length === 0) {
+    if (displayVectors !== props.vectors) return;
+
+    if (displayVectors.length === 0) {
       setSakeStars([]);
       setSelectedSakeId(null);
+      setIsProcessingVectors(false);
       return;
     }
 
-    const N = props.vectors.length;
+    const N = displayVectors.length;
     let initialVectors: THREE.Vector3[] = [];
 
     if (N === 1) {
       initialVectors = [new THREE.Vector3(0, 0, GLOBE_RADIUS)];
     } else {
-      const baseEmbeddings = props.vectors.map((vec) => vec.vector);
+      const baseEmbeddings = displayVectors.map((vec) => vec.vector);
       const initDistanceMatrix = new Matrix(createCosineDistanceMatrix(baseEmbeddings));
       const initMdsResult = classicalMDS(initDistanceMatrix, 3);
       initialVectors = convertMdsToSphere(initMdsResult);
@@ -379,7 +400,7 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
     setSakeStars((prevStars) => {
       const prevStarMap = new Map(prevStars.map((s) => [s.name, s]));
 
-      return props.vectors.map((vec, i) => {
+      return displayVectors.map((vec, i) => {
         const prev = prevStarMap.get(vec.name);
         const targetP = initialVectors[i];
         const targetC = prev ? prev.targetColor : new THREE.Color('#9090a0');
@@ -396,7 +417,8 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
         };
       });
     });
-  }, [props.vectors]);
+    setIsProcessingVectors(false);
+  }, [displayVectors, props.vectors]);
 
   const handleSelectStar = (starId: number) => {
     setSelectedSakeId(starId);
@@ -430,7 +452,7 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
         averageSimilarityToMean: 0.85,
       };
 
-      const textVectorObj = props.vectors.find((v) => v.name === selectedStar.name);
+      const textVectorObj = displayVectors.find((v) => v.name === selectedStar.name);
 
       const comment = await generateVectorAnalysisComment({
         name: selectedStar.name,
@@ -449,7 +471,15 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
   };
 
   return (
-    <div>
+    <div className="relative">
+      {isLoading && (
+        <div className="absolute inset-0 z-50 flex min-h-[70vh] items-center justify-center bg-black text-white">
+          <div className="flex flex-col items-center gap-3" role="status" aria-live="polite">
+            <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <span>ベクトルを計算中...</span>
+          </div>
+        </div>
+      )}
       <div>
         <input
           type="text"
@@ -608,7 +638,7 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
             <div className="mt-3 pt-3 border-t border-slate-700/60">
               {!aiAnalysisResult && !isAnalyzing && (
                 <button
-                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold py-2 px-3 rounded-lg shadow transition-all flex items-center justify-center gap-1.5"
+                  className="w-full bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold py-2 px-3 rounded-lg shadow transition-all flex items-center justify-center gap-1.5"
                   onClick={handleAnalyzeSake}
                 >
                   ✨ Geminiでベクトル特徴を文章解説

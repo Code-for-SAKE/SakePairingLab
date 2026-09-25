@@ -1,10 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { GlobeVisualizer } from '../components/GlobeVisualizer';
 import VectorMaker from '../components/VectorMaker';
 import { TextVector } from '../dummyTypes';
 
 export default function ExploreSake() {
+  const [initialVectors, setInitialVectors] = useState<TextVector[]>([]);
   const [vectors, setVectors] = useState<TextVector[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    import('../data/initialVectors.json').then(({ default: data }) => {
+      if (!isMounted) return;
+      setInitialVectors(data);
+      setVectors(data);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const onDataChange = (data: TextVector[]) => {
     setVectors(data);
@@ -19,7 +34,7 @@ export default function ExploreSake() {
         </p>
       </div>
       <div>
-        <VectorMaker onDataChange={onDataChange} />
+        <VectorMaker initialVectors={initialVectors} onDataChange={onDataChange} />
         <GlobeVisualizer vectors={vectors} />
       </div>
     </div>
