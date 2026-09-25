@@ -432,7 +432,7 @@ export default function MyPage() {
               {!aiAnalysisResult && !isAnalyzing && (
                 <button
                   onClick={handleAnalyzeTasteWithGemini}
-                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2"
+                  className="w-full bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2"
                 >
                   <Sparkles className="w-4 h-4 text-purple-200" />
                   <span>✨ Geminiで「あなたの味覚・好みの癖」を文章解説</span>
