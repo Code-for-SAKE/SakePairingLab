@@ -14,9 +14,9 @@ import {
   X,
 } from 'lucide-react';
 import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, getRandomDocuments } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Sake } from '../types';
+import { Review, Sake } from '../types';
 
 const TEMPERATURE_OPTIONS = [
   '指定なし',
@@ -55,6 +55,7 @@ export default function NewQuest() {
   const [targetVessel, setTargetVessel] = useState('');
   const [targetPairing, setTargetPairing] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [recommending, setRecommending] = useState(false);
 
   useEffect(() => {
     const fetchSakes = async () => {
@@ -122,6 +123,37 @@ export default function NewQuest() {
   };
 
   const rewardPoints = calculatePoints();
+
+  const handleRecommend = async () => {
+    setRecommending(true);
+    try {
+      const reviews = await getRandomDocuments<Review>('reviews', 30);
+      reviews.map((review) => {
+        review.embedding;
+      });
+
+      // const response = await recommendQuestConditions({
+      //   sakeId: selectedSake?.id,
+      //   targetTemperature: targetTemperature === '指定なし' ? undefined : targetTemperature,
+      //   targetPairing: targetPairing.trim() || undefined,
+      //   targetVessel: targetVessel.trim() || undefined,
+      // });
+      const recommendation: any[] | undefined = undefined; //response.data.recommendations[0];
+      if (!recommendation) throw new Error('おすすめ候補が見つかりませんでした。');
+
+      const sake = sakes.find((item) => item.id === recommendation.sakeId);
+      if (sake) setSelectedSake(sake);
+      setTargetTemperature(recommendation.targetTemperature);
+      setTargetPairing(recommendation.targetPairing);
+      setTitle(recommendation.title);
+      setDescription(recommendation.description);
+    } catch (err: any) {
+      console.error('Error recommending quest conditions:', err);
+      alert(err.message || 'おすすめの取得に失敗しました。');
+    } finally {
+      setRecommending(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +225,19 @@ export default function NewQuest() {
             <p className="text-xs text-slate-500 mt-1">
               日本酒・おつまみ・温度・酒器など、指定したい要素を自由に固定できます。固定した条件が多いほど獲得ポイントが上がります！
             </p>
+            <button
+              type="button"
+              onClick={handleRecommend}
+              disabled={recommending}
+              className="mt-3 w-full bg-emerald-600 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+            >
+              {recommending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-2" />
+              )}
+              {recommending ? 'レビューを分析中...' : '未開拓のペアリングをおすすめ'}
+            </button>
           </div>
 
           {/* 1. おつまみ・ペアリング固定 */}

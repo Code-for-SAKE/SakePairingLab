@@ -21,6 +21,26 @@ db.settings({ ignoreUndefinedProperties: true });
 
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
+const QUEST_TEMPERATURE_OPTIONS = [
+  '雪冷え (5℃)',
+  '花冷え (10℃)',
+  '涼冷え (15℃)',
+  '常温 (20℃)',
+  'ぬる燗 (40℃)',
+  '上燗 (45℃)',
+  '熱燗 (50℃)',
+  '飛び切り燗 (55℃〜)',
+];
+
+const QUEST_PAIRING_OPTIONS = [
+  '白身魚の刺身',
+  '和牛ステーキ',
+  'ハードチーズ',
+  'うなぎの蒲焼き',
+  '焼き鳥（タレ）',
+  '塩辛',
+];
+
 function resolveApiKey(): string {
   try {
     return geminiApiKey.value();
@@ -90,6 +110,139 @@ function getMeanVector(embeddings: number[][]): number[] {
 
   return meanVector.map((sum) => sum / embeddings.length);
 }
+
+function toNumberArray(value: unknown): number[] {
+  if (Array.isArray(value)) return value.filter((item): item is number => typeof item === 'number');
+  return (value as { toArray?: () => number[] } | undefined)?.toArray?.() || [];
+}
+
+function cosineDistance(left: number[], right: number[]): number {
+  let dot = 0;
+  let leftNorm = 0;
+  let rightNorm = 0;
+
+  for (let index = 0; index < left.length; index++) {
+    dot += left[index] * right[index];
+    leftNorm += left[index] ** 2;
+    rightNorm += right[index] ** 2;
+  }
+
+  if (leftNorm === 0 || rightNorm === 0) return 1;
+  return 1 - dot / Math.sqrt(leftNorm * rightNorm);
+}
+
+type QuestRecommendationCandidate = {
+  sakeId: string;
+  sakeBrand: string;
+  sakeBottle: string;
+  targetTemperature: string;
+  targetPairing: string;
+  contextEmbedding: number[];
+  distanceFromReviews: number;
+};
+
+/** Finds quest conditions in sparse areas of the review context space. */
+export const recommendQuestConditions = onCall(
+  { secrets: [geminiApiKey], cors: true, timeoutSeconds: 120 },
+  async (request: CallableRequest) => {
+    const { sakeId, targetTemperature, targetPairing, targetVessel } = request.data || {};
+    const sakesSnapshot = await db.collection('sakes').limit(80).get();
+    const sakes = sakesSnapshot.docs
+      .map((doc) => ({ id: doc.id, data: doc.data() as Sake }))
+      .filter(({ data }) => toNumberArray(data.embedding).length >= 1024);
+
+    if (sakes.length === 0) {
+      throw new HttpsError('failed-precondition', '埋め込み済みの日本酒がありません。');
+    }
+
+    const selectedSake = sakeId ? sakes.find((sake) => sake.id === sakeId) : undefined;
+    const candidateSakes = selectedSake ? [selectedSake] : sakes.slice(0, 8);
+    const temperatures = targetTemperature
+      ? [targetTemperature]
+      : QUEST_TEMPERATURE_OPTIONS.slice(0, 4);
+    const pairings = targetPairing ? [targetPairing] : QUEST_PAIRING_OPTIONS.slice(0, 4);
+    const vessel =
+      typeof targetVessel === 'string' && targetVessel.trim() ? targetVessel : '指定なし';
+    const ai = new GoogleGenAI({ apiKey: resolveApiKey() });
+    const candidates: QuestRecommendationCandidate[] = [];
+
+    for (const sake of candidateSakes) {
+      const sakeData = sake.data;
+      const sakeText = buildSakeText(sakeData);
+      const sakeEmbedding = toNumberArray(sakeData.embedding).slice(0, 1024);
+
+      for (const temperature of temperatures) {
+        for (const pairing of pairings) {
+          const contextText = `${sakeText} 温度:${temperature} 酒器:${vessel} おつまみ:${pairing}`;
+          const environmentEmbedding = await generateEmbedding(ai, contextText, 1024);
+          const contextEmbedding = sakeEmbedding.map(
+            (value, index) => 0.5 * value + 0.5 * environmentEmbedding[index],
+          );
+          // reviews.embedding is 2048-dimensional. Zeroing the result half
+          // makes the nearest-neighbor query respond to the context half.
+          const paddedEmbedding = [...contextEmbedding, ...new Array(1024).fill(0)];
+          const nearestReviewQuery = db.collection('reviews').findNearest({
+            vectorField: 'embedding',
+            queryVector: FieldValue.vector(paddedEmbedding),
+            limit: 1,
+            distanceMeasure: 'COSINE',
+            distanceResultField: 'distance',
+          });
+          const nearestReviewSnapshot = await nearestReviewQuery.get();
+          const nearestReviewDistance = nearestReviewSnapshot.empty
+            ? 1
+            : ((nearestReviewSnapshot.docs[0].data() as { distance?: number }).distance ?? 1);
+
+          candidates.push({
+            sakeId: sake.id,
+            sakeBrand: sakeData.brand || '',
+            sakeBottle: sakeData.bottle || '',
+            targetTemperature: temperature,
+            targetPairing: pairing,
+            contextEmbedding,
+            distanceFromReviews: nearestReviewDistance,
+          });
+        }
+      }
+    }
+
+    const selected: QuestRecommendationCandidate[] = [];
+    while (candidates.length > 0 && selected.length < 3) {
+      let bestIndex = 0;
+      let bestScore = Number.NEGATIVE_INFINITY;
+
+      candidates.forEach((candidate, index) => {
+        const distanceFromSelected = selected.length
+          ? Math.min(
+              ...selected.map((item) =>
+                cosineDistance(candidate.contextEmbedding, item.contextEmbedding),
+              ),
+            )
+          : 1;
+        const score = candidate.distanceFromReviews * 0.8 + distanceFromSelected * 0.2;
+        if (score > bestScore) {
+          bestScore = score;
+          bestIndex = index;
+        }
+      });
+
+      selected.push(candidates.splice(bestIndex, 1)[0]);
+    }
+
+    return {
+      recommendations: selected.map((candidate) => ({
+        sakeId: candidate.sakeId,
+        sakeBrand: candidate.sakeBrand,
+        sakeBottle: candidate.sakeBottle,
+        targetTemperature: candidate.targetTemperature,
+        targetPairing: candidate.targetPairing,
+        title: `【${candidate.sakeBrand}】${candidate.targetPairing}との未知のペアリングを探せ`,
+        description: '過去のレビューと異なる条件を、空間充填アプローチで選出しました。',
+        rewardPoints: 125,
+      })),
+    };
+  },
+);
 
 /**
  * Triggered automatically when a Sake document is created or updated.
