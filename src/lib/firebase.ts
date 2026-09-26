@@ -23,7 +23,11 @@ async function testConnection() {
 }
 testConnection();
 
-export async function getRandomDocuments<T>(collectionName: string, targetCount = 100) {
+export async function getRandomDocuments<T>(
+  collectionName: string,
+  targetCount = 100,
+  limitCount = 10,
+) {
   const resultDocs = new Map(); // 重複排除とデータ保持用 (ID -> Data)
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -42,7 +46,7 @@ export async function getRandomDocuments<T>(collectionName: string, targetCount 
       collection(db, collectionName),
       orderBy('__name__'),
       startAt(randomPrefix),
-      limit(5),
+      limit(limitCount),
     );
 
     const snapshot = await getDocs(q);

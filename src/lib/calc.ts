@@ -138,3 +138,117 @@ export function getOrthogonalVector(vectorA: number[], vectorB: number[]): numbe
   // 3. Aから「Bの成分」を差し引くことで、Bと完全に直交する（交わらない）ベクトルを抽出
   return vectorA.map((val, i) => val - dotProduct * unitB[i]);
 }
+
+/**
+ * 1024次元のベクトルをL2正規化する（長さを1にする）
+ */
+const normalize = (v: number[]): number[] => {
+  let sumSq = 0;
+  for (let i = 0; i < v.length; i++) sumSq += v[i] * v[i];
+  const norm = Math.sqrt(sumSq) + 1e-9;
+  return v.map((x) => x / norm);
+};
+
+/**
+ * 2つの1024次元ベクトルの内積（コサイン類似度）を計算する
+ */
+const dotProduct = (v1: number[], v2: number[]): number => {
+  let dot = 0;
+  for (let i = 0; i < v1.length; i++) dot += v1[i] * v2[i];
+  return dot;
+};
+
+/**
+ * ニューラルネット/外部ライブラリ不使用の空洞ベクトル探索
+ * @param existing 既存ベクトルの2次元配列 [N][1024] （正規化済みを推奨）
+ * @param numVoids 取得したい空洞ベクトルの数 (K)
+ * @param steps ループ回数
+ * @param lr 学習率（1ステップの移動量）
+ */
+export const findVoidVectorsPure = (
+  existing: number[][],
+  numVoids: number = 3,
+  steps: number = 100,
+  lr: number = 0.02,
+): number[][] => {
+  const N = existing.length;
+  if (N === 0) return [];
+  const DIM = existing[0].length; // 1024
+
+  // 0. 既存ベクトルをあらかじめ正規化しておく
+  const normExisting = existing.map((v) => normalize(v));
+
+  // 1. 既存データの重心（平均）を計算
+  const mean = new Array(DIM).fill(0);
+  for (let j = 0; j < DIM; j++) {
+    for (let i = 0; i < N; i++) {
+      mean[j] += normExisting[i][j];
+    }
+    mean[j] /= N;
+  }
+
+  // 2. 空洞ベクトルの初期値をランダム生成（既存の重心付近から少しずらして配置）
+  let voids: number[][] = Array.from({ length: numVoids }, () => {
+    const v = new Array(DIM);
+    for (let j = 0; j < DIM; j++) {
+      // 平均値 + 小さなランダムノイズ
+      v[j] = mean[j] + (Math.random() - 0.5) * 0.2;
+    }
+    return normalize(v);
+  });
+
+  // 3. 反発力シミュレーションのループ
+  for (let step = 0; step < steps; step++) {
+    // 次のステップの空洞ベクトルを格納する配列
+    const nextVoids = voids.map((v) => [...v]);
+
+    for (let k = 0; k < numVoids; k++) {
+      const vK = voids[k];
+      // 1024次元の「移動方向（勾配）」を格納する配列
+      const gradient = new Array(DIM).fill(0);
+
+      // --- 斥力1: 既存ベクトルから遠ざかる力を計算 ---
+      for (let i = 0; i < N; i++) {
+        const eI = normExisting[i];
+        const cosSim = dotProduct(vK, eI); // -1 ~ 1
+        const dist = 1.0 - cosSim; // コサイン距離 (0 ~ 2)
+
+        // 距離の逆数の微分から導出される「反発力の強さ」
+        // 距離が近い（distが小さい）ほど、爆発的に強い力がかかる
+        const weight = 1.0 / (dist * dist + 1e-5);
+
+        for (let j = 0; j < DIM; j++) {
+          // eI[j] の方向とは「逆」に動かしたいので、引き算の方向に力を加える
+          gradient[j] -= weight * (eI[j] - cosSim * vK[j]);
+        }
+      }
+
+      // --- 斥力2: 他の空洞ベクトルから遠ざかる力を計算 ---
+      for (let o = 0; o < numVoids; o++) {
+        if (k === o) continue; // 自分自身は無視
+        const vO = voids[o];
+        const cosSim = dotProduct(vK, vO);
+        const dist = 1.0 - cosSim;
+        const weight = 0.5 / (dist * dist + 1e-5); // 他の空洞からの力は少し弱める(0.5)
+
+        for (let j = 0; j < DIM; j++) {
+          gradient[j] -= weight * (vO[j] - cosSim * vK[j]);
+        }
+      }
+
+      // --- 4. 計算した反発力（勾配）の方向にベクトルを動かす ---
+      for (let j = 0; j < DIM; j++) {
+        // 斥力（マイナス勾配）の方向へ学習率(lr)を掛けて移動
+        nextVoids[k][j] -= lr * gradient[j];
+      }
+
+      // 単位球面上に引き戻すために再正規化
+      nextVoids[k] = normalize(nextVoids[k]);
+    }
+
+    // すべての空洞ベクトルの位置を更新
+    voids = nextVoids;
+  }
+
+  return voids;
+};

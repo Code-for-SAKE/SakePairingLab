@@ -14,9 +14,12 @@ import {
   X,
 } from 'lucide-react';
 import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
-import { db, getRandomDocuments } from '../lib/firebase';
+import { app, db, getRandomDocuments } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Review, Sake } from '../types';
+import { generateQueryEmbedding, generateRecommendQuest } from '../lib/gemini';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { findVoidVectorsPure } from '../lib/calc';
 
 const TEMPERATURE_OPTIONS = [
   '指定なし',
@@ -127,26 +130,65 @@ export default function NewQuest() {
   const handleRecommend = async () => {
     setRecommending(true);
     try {
-      const reviews = await getRandomDocuments<Review>('reviews', 30);
+      const reviews = await getRandomDocuments<Review>('reviews', 5, 2);
+      const reviewEmbeddings: number[][] = [];
       reviews.map((review) => {
-        review.embedding;
+        if (review.embedding) {
+          // 前半1024次元が、日本酒、温度、酒器、おつまみの情報
+          reviewEmbeddings.push(review.embedding?.toArray().slice(0, 1024));
+        }
       });
+      if (reviewEmbeddings.length < 0) {
+        throw new Error('ランダムレビューが見つかりませんでした。');
+      }
+      const start = performance.now();
+      // 3箇所の空洞を、100回ループで計算
+      const voids = findVoidVectorsPure(reviewEmbeddings, 1, 100, 0.02);
+      const end = performance.now();
 
-      // const response = await recommendQuestConditions({
-      //   sakeId: selectedSake?.id,
-      //   targetTemperature: targetTemperature === '指定なし' ? undefined : targetTemperature,
-      //   targetPairing: targetPairing.trim() || undefined,
-      //   targetVessel: targetVessel.trim() || undefined,
-      // });
-      const recommendation: any[] | undefined = undefined; //response.data.recommendations[0];
-      if (!recommendation) throw new Error('おすすめ候補が見つかりませんでした。');
+      console.log(`空洞計算時間: ${(end - start).toFixed(2)} ms`);
 
-      const sake = sakes.find((item) => item.id === recommendation.sakeId);
-      if (sake) setSelectedSake(sake);
-      setTargetTemperature(recommendation.targetTemperature);
-      setTargetPairing(recommendation.targetPairing);
-      setTitle(recommendation.title);
-      setDescription(recommendation.description);
+      // Try Cloud Function vector search first
+      const functions = getFunctions(app);
+      const searchByVector = httpsCallable<
+        { queryVector: number[]; limit?: number },
+        { success: boolean; results: Sake[] }
+      >(functions, 'searchSakesByVector');
+
+      if (voids.length == 0) {
+        throw new Error('おすすめ空洞範囲が見つかりませんでした。');
+      }
+      // 空洞にあたるレビュー条件を出力
+      const recommend = await generateRecommendQuest(voids[0], {
+        sakeCharacter: selectedSake?.brand
+          ? `銘柄: ${selectedSake?.brand} `
+          : '' + selectedSake?.bottle
+            ? `ボトリング: ${selectedSake?.bottle} `
+            : '',
+        targetTemperature: targetTemperature === '指定なし' ? undefined : targetTemperature,
+        targetPairing: targetPairing.trim() || undefined,
+        targetVessel: targetVessel.trim() || undefined,
+      });
+      console.log(recommend);
+      if (!recommend) {
+        throw new Error('おすすめ候補が見つかりませんでした。');
+      }
+      debugger;
+      //日本酒のおすすめを設定
+      if (!selectedSake && recommend.sakeCharacter) {
+        const vector = await generateQueryEmbedding(recommend.sakeCharacter, 1024);
+        const res = await searchByVector({ queryVector: vector, limit: 1 });
+        console.log(res.data);
+        const sakes = res.data.results;
+        setSelectedSake(sakes.length == 0 ? null : sakes[0]);
+      }
+      if (targetTemperature === '指定なし' && recommend.targetTemperature)
+        setTargetTemperature(recommend.targetTemperature);
+      if (!targetPairing && recommend.targetPairing) setTargetPairing(recommend.targetPairing);
+      if (!targetVessel && recommend.targetVessel) setTargetVessel(recommend.targetVessel);
+
+      setTitle(recommend.title ?? '');
+      setDescription(recommend.recommendComment ?? '');
     } catch (err: any) {
       console.error('Error recommending quest conditions:', err);
       alert(err.message || 'おすすめの取得に失敗しました。');

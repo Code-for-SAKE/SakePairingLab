@@ -64,6 +64,15 @@ export type Quest = {
   createdAt?: any;
 };
 
+export type RecommendQuest = {
+  title?: string;
+  sakeCharacter?: string;
+  targetTemperature?: string;
+  targetVessel?: string;
+  targetPairing?: string;
+  recommendComment?: string;
+};
+
 // レスポンスの型定義
 export interface NetworkNode {
   id: string;
