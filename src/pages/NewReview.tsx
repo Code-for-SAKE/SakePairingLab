@@ -53,24 +53,26 @@ export default function NewReview() {
     targetTemperature?: string;
     targetPairing?: string;
     targetVessel?: string;
+    reviewCopy?: Review;
   } | null;
+  const reviewCopy = questData?.reviewCopy;
   const hasApiKey = hasUserApiKey();
 
   const [step, setStep] = useState(1); // 1: Aroma, 2: Taste, 3: Pairing & Post
 
-  const [aromaBroads, setAromaBroads] = useState<string[]>([]);
-  const [aromaSpecific, setAromaSpecific] = useState<string[]>([]);
-  const [aromaCustom, setAromaCustom] = useState('');
+  const [aromaBroads, setAromaBroads] = useState<string[]>(reviewCopy?.aroma?.broads ?? []);
+  const [aromaSpecific, setAromaSpecific] = useState<string[]>(reviewCopy?.aroma?.specific ?? []);
+  const [aromaCustom, setAromaCustom] = useState(reviewCopy?.aroma?.custom ?? '');
   const [generatingAroma, setGeneratingAroma] = useState(false);
 
-  const [tasteBroads, setTasteBroads] = useState<string[]>([]);
-  const [tasteSpecific, setTasteSpecific] = useState<string[]>([]);
-  const [tasteCustom, setTasteCustom] = useState('');
+  const [tasteBroads, setTasteBroads] = useState<string[]>(reviewCopy?.taste?.broads ?? []);
+  const [tasteSpecific, setTasteSpecific] = useState<string[]>(reviewCopy?.taste?.specific ?? []);
+  const [tasteCustom, setTasteCustom] = useState(reviewCopy?.taste?.custom ?? '');
   const [generatingTaste, setGeneratingTaste] = useState(false);
 
-  const [temperature, setTemperature] = useState('常温 (20℃)');
-  const [vessel, setVessel] = useState('お猪口');
-  const [pairing, setPairing] = useState('');
+  const [temperature, setTemperature] = useState(reviewCopy?.temperature ?? '常温 (20℃)');
+  const [vessel, setVessel] = useState(reviewCopy?.vessel ?? 'お猪口');
+  const [pairing, setPairing] = useState(reviewCopy?.pairing ?? '');
   const [comment, setComment] = useState('');
 
   // ユーザーの最新最大30件の投稿コメントを取得する（orderBy + limit を使用）

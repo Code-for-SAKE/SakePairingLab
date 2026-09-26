@@ -2,8 +2,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { Review, Sake, UserProfile } from '../types';
 import { ja } from 'date-fns/locale';
 import RatingBadge from './RatingBadge';
-import { Heart, MessageCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Copy, Heart, MessageCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 type ReviewCardReview = Review & { user?: UserProfile; sake?: Sake };
 
@@ -13,6 +14,13 @@ interface ReviewCardProps<T extends ReviewCardReview> {
 
 export const ReviewCard = <T extends ReviewCardReview>(props: ReviewCardProps<T>) => {
   const { review } = props;
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleDuplicate = () => {
+    navigate(`/sake/${review.sakeId}/review`, { state: { reviewCopy: review } });
+  };
+
   return (
     <div key={review.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
       <div className="flex items-center justify-between mb-4">
@@ -134,15 +142,27 @@ export const ReviewCard = <T extends ReviewCardReview>(props: ReviewCardProps<T>
         </div>
       )}
 
-      <div className="flex items-center text-slate-400 text-xs mt-2">
-        <button className="flex items-center space-x-1 mx-1 hover:text-indigo-500 transition-colors">
-          <Heart className="w-5 h-5" />
-          <span>{review.likesCount || 0}</span>
-        </button>
-        <button className="flex items-center space-x-2 mx-1 hover:text-indigo-500 transition-colors">
-          <MessageCircle className="w-5 h-5" />
-          <span className="text-sm">0</span>
-        </button>
+      <div className="flex items-center justify-between text-slate-400 text-xs mt-2">
+        <div className="flex items-center">
+          <button className="flex items-center space-x-1 mx-1 hover:text-indigo-500 transition-colors">
+            <Heart className="w-5 h-5" />
+            <span>{review.likesCount || 0}</span>
+          </button>
+          <button className="flex items-center space-x-2 mx-1 hover:text-indigo-500 transition-colors">
+            <MessageCircle className="w-5 h-5" />
+            <span className="text-sm">0</span>
+          </button>
+        </div>
+        {user?.uid === review.userId && (
+          <button
+            onClick={handleDuplicate}
+            aria-label="レビューを複製"
+            className="inline-flex items-center gap-1.5 px-2 py-1 text-indigo-600 hover:text-indigo-800 transition-colors"
+          >
+            <Copy className="w-4 h-4" />
+            <span>レビューを複製</span>
+          </button>
+        )}
       </div>
     </div>
   );
