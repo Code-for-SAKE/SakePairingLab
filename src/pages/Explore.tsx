@@ -41,7 +41,7 @@ export default function ExplorePage() {
         >(functions, 'searchSakesByVector');
 
         const vector = await generateQueryEmbedding(query, 1024);
-        const res = await searchByVector({ queryVector: vector, limit: 5 });
+        const res = await searchByVector({ queryVector: vector, limit: 10 });
         if (isMounted && res.data.results) {
           setVectorResults(res.data.results);
           setIsSearchingVector(false);
@@ -66,7 +66,7 @@ export default function ExplorePage() {
           { success: boolean; results: Sake[] }
         >(functions, 'searchSakesByText');
 
-        const res = await searchSakesByText({ queryText: query, limit: 5 });
+        const res = await searchSakesByText({ queryText: query, limit: 10 });
         if (isMounted && res.data.results) {
           setVectorResults(res.data.results);
           setIsSearchingVector(false);
