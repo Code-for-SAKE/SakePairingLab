@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Home, FlaskRound, Compass, User } from 'lucide-react';
 import Header from './components/Header';
 
+const AboutPage = lazy(() => import('./pages/About'));
 const HomePage = lazy(() => import('./pages/Home'));
 const ExplorePage = lazy(() => import('./pages/Explore'));
 const ExploreSake = lazy(() => import('./pages/ExploreSake2'));
@@ -55,6 +56,21 @@ function Navigation() {
 
 function MainLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, signInWithGoogle } = useAuth();
+  const location = useLocation();
+
+  if (location.pathname === '/about') {
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center text-slate-400">
+            読み込み中...
+          </div>
+        }
+      >
+        <AboutPage />
+      </Suspense>
+    );
+  }
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -77,6 +93,12 @@ function MainLayout({ children }: { children: React.ReactNode }) {
           >
             Googleでログイン
           </button>
+          <Link
+            to="/about"
+            className="inline-flex mt-5 text-sm font-medium text-slate-600 hover:text-indigo-600"
+          >
+            このアプリについて
+          </Link>
         </div>
       </div>
     );
@@ -104,6 +126,7 @@ export default function App() {
             }
           >
             <Routes>
+              <Route path="/about" element={<AboutPage />} />
               <Route path="/" element={<HomePage />} />
               <Route path="/explore" element={<ExplorePage />} />
               <Route path="/quests" element={<QuestPage />} />
