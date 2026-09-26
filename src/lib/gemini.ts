@@ -1,4 +1,5 @@
 import { GoogleGenAI, Modality } from '@google/genai';
+import { RecommendQuest } from '../types';
 
 /**
  * Retrieves the Gemini API key.
@@ -139,7 +140,7 @@ export async function generateQueryEmbedding(text: string, dimension: number): P
 }
 
 /**
- * Generates text from embedding
+ * Generates prompt text from embedding
  */
 export async function generateFlavorImagePrompt(
   name: string,
@@ -342,4 +343,73 @@ ${reviewText}
   });
 
   return (response.text || '').trim();
+}
+
+const TEMPERATURE_OPTIONS = [
+  '指定なし',
+  '雪冷え (5℃)',
+  '花冷え (10℃)',
+  '涼冷え (15℃)',
+  '常温 (20℃)',
+  'ぬる燗 (40℃)',
+  '上燗 (45℃)',
+  '熱燗 (50℃)',
+  '飛び切り燗 (55℃〜)',
+];
+
+const VESSEL_PRESETS = ['ワイングラス', '平盃', 'お猪口', '薄張りグラス', '陶器', '木枡'];
+
+/**
+ * Generates recommend from embedding
+ */
+export async function generateRecommendQuest(
+  embedding: number[],
+  condition: RecommendQuest,
+): Promise<RecommendQuest> {
+  const apiKey = await resolveApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  // 3. 【ステップ1】1024次元ベクトルを画像用英語プロンプトに逆翻訳
+  const textPrompt = `あなたは日本酒ソムリエであり、データサイエンティストでもあります。
+  以下は日本酒と飲み方（温度、酒器、合わせるおつまみ）を表すの1024次元の埋め込みベクトルです:
+      [${embedding.join(', ')}]
+  この意味的ベクトルデータに基づき、その特徴を解釈し、日本酒の味わい、香りの特徴と、温度、酒器、合わせるおつまみをフォーマットに従って生成してください。
+  ただし以下は決まっています。
+  ${condition.sakeCharacter ? '日本酒の特徴:' + condition.sakeCharacter : ''}
+  ${condition.targetTemperature ? '温度:' + condition.targetTemperature : ''}
+  ${condition.targetVessel ? '酒器:' + condition.targetVessel : ''}
+  ${condition.targetPairing ? '合わせるおつまみ:' + condition.targetPairing : ''}
+  `;
+
+  const response = await ai.models.generateContent({
+    model: 'models/gemini-3.1-flash-lite',
+    contents: textPrompt,
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'object', // または "object" (エンドポイントやSDKにより大文字・小文字の仕様に注意)
+        properties: {
+          title: { type: 'STRING' },
+          sakeCharacter: { type: 'STRING' },
+          targetTemperature: { type: 'STRING', enum: TEMPERATURE_OPTIONS },
+          targetVessel: { type: 'STRING', enum: VESSEL_PRESETS },
+          targetPairing: { type: 'STRING' },
+          recommendComment: { type: 'STRING' },
+        },
+        required: ['sakeCharacter', 'targetPairing', 'recommendComment'],
+      },
+    },
+  });
+
+  if (!response || !response.text) {
+    throw new Error('生成に失敗しました。');
+  }
+
+  const data = JSON.parse(response.text);
+
+  if (!data) {
+    throw new Error('JSON解析に失敗しました。');
+  }
+
+  return data as RecommendQuest;
 }

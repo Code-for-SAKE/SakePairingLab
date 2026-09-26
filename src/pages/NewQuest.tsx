@@ -14,9 +14,12 @@ import {
   X,
 } from 'lucide-react';
 import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { app, db, getRandomDocuments } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { Sake } from '../types';
+import { Review, Sake } from '../types';
+import { generateQueryEmbedding, generateRecommendQuest } from '../lib/gemini';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { findVoidVectorsPure } from '../lib/calc';
 
 const TEMPERATURE_OPTIONS = [
   '指定なし',
@@ -55,6 +58,7 @@ export default function NewQuest() {
   const [targetVessel, setTargetVessel] = useState('');
   const [targetPairing, setTargetPairing] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [recommending, setRecommending] = useState(false);
 
   useEffect(() => {
     const fetchSakes = async () => {
@@ -122,6 +126,76 @@ export default function NewQuest() {
   };
 
   const rewardPoints = calculatePoints();
+
+  const handleRecommend = async () => {
+    setRecommending(true);
+    try {
+      const reviews = await getRandomDocuments<Review>('reviews', 5, 2);
+      const reviewEmbeddings: number[][] = [];
+      reviews.map((review) => {
+        if (review.embedding) {
+          // 前半1024次元が、日本酒、温度、酒器、おつまみの情報
+          reviewEmbeddings.push(review.embedding?.toArray().slice(0, 1024));
+        }
+      });
+      if (reviewEmbeddings.length < 0) {
+        throw new Error('ランダムレビューが見つかりませんでした。');
+      }
+      const start = performance.now();
+      // 3箇所の空洞を、100回ループで計算
+      const voids = findVoidVectorsPure(reviewEmbeddings, 1, 100, 0.02);
+      const end = performance.now();
+
+      console.log(`空洞計算時間: ${(end - start).toFixed(2)} ms`);
+
+      // Try Cloud Function vector search first
+      const functions = getFunctions(app);
+      const searchByVector = httpsCallable<
+        { queryVector: number[]; limit?: number },
+        { success: boolean; results: Sake[] }
+      >(functions, 'searchSakesByVector');
+
+      if (voids.length == 0) {
+        throw new Error('おすすめ空洞範囲が見つかりませんでした。');
+      }
+      // 空洞にあたるレビュー条件を出力
+      const recommend = await generateRecommendQuest(voids[0], {
+        sakeCharacter: selectedSake?.brand
+          ? `銘柄: ${selectedSake?.brand} `
+          : '' + selectedSake?.bottle
+            ? `ボトリング: ${selectedSake?.bottle} `
+            : '',
+        targetTemperature: targetTemperature === '指定なし' ? undefined : targetTemperature,
+        targetPairing: targetPairing.trim() || undefined,
+        targetVessel: targetVessel.trim() || undefined,
+      });
+      console.log(recommend);
+      if (!recommend) {
+        throw new Error('おすすめ候補が見つかりませんでした。');
+      }
+      debugger;
+      //日本酒のおすすめを設定
+      if (!selectedSake && recommend.sakeCharacter) {
+        const vector = await generateQueryEmbedding(recommend.sakeCharacter, 1024);
+        const res = await searchByVector({ queryVector: vector, limit: 1 });
+        console.log(res.data);
+        const sakes = res.data.results;
+        setSelectedSake(sakes.length == 0 ? null : sakes[0]);
+      }
+      if (targetTemperature === '指定なし' && recommend.targetTemperature)
+        setTargetTemperature(recommend.targetTemperature);
+      if (!targetPairing && recommend.targetPairing) setTargetPairing(recommend.targetPairing);
+      if (!targetVessel && recommend.targetVessel) setTargetVessel(recommend.targetVessel);
+
+      setTitle(recommend.title ?? '');
+      setDescription(recommend.recommendComment ?? '');
+    } catch (err: any) {
+      console.error('Error recommending quest conditions:', err);
+      alert(err.message || 'おすすめの取得に失敗しました。');
+    } finally {
+      setRecommending(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +267,19 @@ export default function NewQuest() {
             <p className="text-xs text-slate-500 mt-1">
               日本酒・おつまみ・温度・酒器など、指定したい要素を自由に固定できます。固定した条件が多いほど獲得ポイントが上がります！
             </p>
+            <button
+              type="button"
+              onClick={handleRecommend}
+              disabled={recommending}
+              className="mt-3 w-full bg-emerald-600 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+            >
+              {recommending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-2" />
+              )}
+              {recommending ? 'レビューを分析中...' : '未開拓のペアリングをおすすめ'}
+            </button>
           </div>
 
           {/* 1. おつまみ・ペアリング固定 */}
