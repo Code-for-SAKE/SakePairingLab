@@ -13,7 +13,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
+import { query, collection, addDoc, getDocs, serverTimestamp, where } from 'firebase/firestore';
 import { app, db, getRandomDocuments } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Review, Sake } from '../types';
@@ -130,7 +130,12 @@ export default function NewQuest() {
   const handleRecommend = async () => {
     setRecommending(true);
     try {
-      const reviews = await getRandomDocuments<Review>('reviews', 5, 2);
+      let reviewquery = query(collection(db, 'reviews'));
+      debugger;
+      if (selectedSake) {
+        reviewquery = query(reviewquery, where('sakeId', '==', selectedSake.id));
+      }
+      const reviews = await getRandomDocuments<Review>(reviewquery, 5, 2);
       const reviewEmbeddings: number[][] = [];
       reviews.map((review) => {
         if (review.embedding) {

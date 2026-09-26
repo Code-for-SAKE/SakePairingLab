@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer, Query } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFunctions } from 'firebase/functions';
 import config from '@/firebase-applet-config.json';
@@ -24,7 +24,7 @@ async function testConnection() {
 testConnection();
 
 export async function getRandomDocuments<T>(
-  collectionName: string,
+  conditionQuery: Query,
   targetCount = 100,
   limitCount = 10,
 ) {
@@ -42,12 +42,7 @@ export async function getRandomDocuments<T>(
       chars.charAt(Math.floor(Math.random() * chars.length));
 
     // その文字列以降から最大5件をサンプリング
-    const q = query(
-      collection(db, collectionName),
-      orderBy('__name__'),
-      startAt(randomPrefix),
-      limit(limitCount),
-    );
+    const q = query(conditionQuery, orderBy('__name__'), startAt(randomPrefix), limit(limitCount));
 
     const snapshot = await getDocs(q);
     let addedInThisLoop = 0;
