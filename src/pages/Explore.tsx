@@ -9,16 +9,35 @@ import { generateQueryEmbedding, hasUserApiKey } from '../lib/gemini';
 import { SakeCard } from '../components/SakeCard';
 import { collection, getCountFromServer } from 'firebase/firestore';
 
+const SEARCH_STATE_KEY = 'sake-explore-search-state';
+
+function readSearchState(): { query: string; results: Sake[] | null } {
+  try {
+    const savedState = sessionStorage.getItem(SEARCH_STATE_KEY);
+    if (!savedState) return { query: '', results: null };
+
+    const parsed = JSON.parse(savedState);
+    return {
+      query: typeof parsed.query === 'string' ? parsed.query : '',
+      results: Array.isArray(parsed.results) ? (parsed.results as Sake[]) : null,
+    };
+  } catch {
+    return { query: '', results: null };
+  }
+}
+
 export default function ExplorePage() {
   const { profile } = useAuth();
   const [count, setCount] = useState<number | null>(null);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => readSearchState().query);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComposing, setIsComposing] = useState(false);
 
   // Vector Search States
-  const [vectorResults, setVectorResults] = useState<Sake[] | null>(null);
+  const [vectorResults, setVectorResults] = useState<Sake[] | null>(
+    () => readSearchState().results,
+  );
   const [isSearchingVector, setIsSearchingVector] = useState(false);
   const [vectorSearchError, setVectorSearchError] = useState<string | null>(null);
 
@@ -113,6 +132,14 @@ export default function ExplorePage() {
       clearTimeout(timer);
     };
   }, [query]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({ query, results: vectorResults }));
+    } catch (storageError) {
+      console.warn('Could not persist sake search state:', storageError);
+    }
+  }, [query, vectorResults]);
 
   const handleSearch = async () => {
     const trimmed = query.trim();
