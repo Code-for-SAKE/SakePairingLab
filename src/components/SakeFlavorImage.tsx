@@ -37,7 +37,7 @@ function resizeImageToDataUrl(file: File): Promise<string> {
         scaledW,
         scaledH,
       );
-      resolve(canvas.toDataURL('image/png'));
+      resolve(canvas.toDataURL('image/webp', 0.8));
     };
     img.onerror = () => {
       URL.revokeObjectURL(objectUrl);
@@ -71,7 +71,7 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const storage = getStorage();
-  const storageRef = ref(storage, `sake_flavor_arts/${sakeId}.png`);
+  const storageRef = ref(storage, `sake_flavor_arts/${sakeId}.webp`);
   const hasApiKey = hasUserApiKey();
 
   // マウント時：Storage に既存画像があるか確認
