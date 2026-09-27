@@ -8,6 +8,8 @@ const UPLOAD_SIZE = 1024; // アップロード画像サイズ (px)
 interface SakeFlavorImageProps {
   sakeId: string;
   sakeName: string;
+  imageUrl?: string | null;
+  onImageUrlChange?: (imageUrl: string) => void | Promise<void>;
   embedding?: number[] | undefined;
   editable?: boolean;
 }
@@ -56,11 +58,12 @@ function getInitials(name: string): string {
 export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
   sakeId,
   sakeName,
+  imageUrl,
+  onImageUrlChange,
   embedding,
   editable = false,
 }) => {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+  const [displayImageUrl, setDisplayImageUrl] = useState<string | null>(imageUrl ?? null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -74,19 +77,16 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
   const storageRef = ref(storage, `sake_flavor_arts/${sakeId}.webp`);
   const hasApiKey = hasUserApiKey();
 
-  // マウント時：Storage に既存画像があるか確認
   useEffect(() => {
-    if (!sakeId) {
-      setIsInitialLoading(false);
-      return;
-    }
-    getDownloadURL(storageRef)
-      .then((url) => setImageUrl(url))
-      .catch(() => {
-        /* まだ画像なし — 正常 */
-      })
-      .finally(() => setIsInitialLoading(false));
-  }, [sakeId]);
+    console.log(`${sakeId} ${imageUrl}`);
+    setDisplayImageUrl(imageUrl ?? null);
+  }, [imageUrl, sakeId]);
+
+  const publishImageUrl = async () => {
+    const downloadUrl = await getDownloadURL(storageRef);
+    await onImageUrlChange?.(downloadUrl);
+    setDisplayImageUrl(downloadUrl);
+  };
 
   const resetModalState = () => {
     setFailedPrompt(null);
@@ -116,8 +116,7 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
       const { base64Data, mimeType } = await generateFlavorImage(generatedPrompt);
       const dataUrl = `data:${mimeType};base64,${base64Data}`;
       await uploadString(storageRef, dataUrl, 'data_url', { contentType: mimeType });
-      const downloadUrl = await getDownloadURL(storageRef);
-      setImageUrl(downloadUrl);
+      await publishImageUrl();
       setIsModalOpen(false);
     } catch (err: any) {
       console.error('Image Generation Error:', err);
@@ -141,9 +140,8 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
 
     try {
       const dataUrl = await resizeImageToDataUrl(file);
-      await uploadString(storageRef, dataUrl, 'data_url', { contentType: 'image/png' });
-      const downloadUrl = await getDownloadURL(storageRef);
-      setImageUrl(downloadUrl);
+      await uploadString(storageRef, dataUrl, 'data_url', { contentType: 'image/webp' });
+      await publishImageUrl();
       setIsModalOpen(false);
     } catch (err: any) {
       console.error('Manual Upload Error:', err);
@@ -158,13 +156,10 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
   // ─── 画像エリア ────────────────────────────────────
   const imageArea = (
     <div className="relative w-full aspect-square">
-      {isInitialLoading ? (
-        /* 初期読み込みスケルトン */
-        <div className="h-full w-full rounded-2xl bg-[linear-gradient(90deg,#f0f0f0_25%,#e0e0e0_50%,#f0f0f0_75%)] animate-[skeleton-shimmer_1.4s_infinite]" />
-      ) : imageUrl ? (
+      {displayImageUrl ? (
         <img
           className="w-full h-full rounded-2xl object-cover block"
-          src={imageUrl}
+          src={displayImageUrl}
           alt={`${sakeName}の味わいビジュアル`}
         />
       ) : (
@@ -177,7 +172,7 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
       )}
 
       {/* 右下の編集ボタン */}
-      {editable && !isInitialLoading && (
+      {editable && (
         <button
           onClick={openModal}
           title="画像を編集"
@@ -304,7 +299,6 @@ export const SakeFlavorImage: React.FC<SakeFlavorImageProps> = ({
       {/* アニメーション定義 */}
       <style>{`
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes skeleton-shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
       `}</style>
     </>
   );

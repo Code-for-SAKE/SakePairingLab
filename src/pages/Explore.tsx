@@ -324,7 +324,9 @@ export default function ExplorePage() {
       ) : (
         <div className="space-y-3">
           {displayList.map((sake) => (
-            <SakeCard sake={sake} isUsingVectorSearch={isUsingVectorSearch} />
+            <div key={sake.id}>
+              <SakeCard sake={sake} isUsingVectorSearch={isUsingVectorSearch} />
+            </div>
           ))}
           {displayList.length === 0 && (
             <div className="text-center py-12 text-slate-500">

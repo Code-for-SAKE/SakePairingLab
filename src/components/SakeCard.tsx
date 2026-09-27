@@ -1,6 +1,8 @@
 import { Sake } from '../types';
 import { Link } from 'react-router-dom';
+import { doc, updateDoc } from 'firebase/firestore';
 import { SakeFlavorImage } from './SakeFlavorImage';
+import { db } from '../lib/firebase';
 
 interface SakeCardProps {
   sake: Sake;
@@ -20,6 +22,10 @@ export const SakeCard = (props: SakeCardProps) => {
           <SakeFlavorImage
             sakeId={sake.id}
             sakeName={`${sake.brand} ${sake.bottle}(${sake.brewery})`}
+            imageUrl={sake.imageUrl}
+            onImageUrlChange={(imageUrl) =>
+              updateDoc(doc(db, 'sakes', sake.id), { imageUrl })
+            }
           />
         </div>
         <div>
