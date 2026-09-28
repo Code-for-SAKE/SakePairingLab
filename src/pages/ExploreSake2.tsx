@@ -96,14 +96,14 @@ export default function ExploreSake() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'initialVectors.json';
+      link.download = 'sakeVectors.json';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Failed to create initialVectors.json:', error);
-      setInitialVectorsError('initialVectors.jsonの作成に失敗しました。');
+      console.error('Failed to create sakeVectors.json:', error);
+      setInitialVectorsError('sakeVectors.jsonの作成に失敗しました。');
     } finally {
       setIsDownloadingInitialVectors(false);
     }
