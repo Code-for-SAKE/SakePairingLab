@@ -13,6 +13,7 @@ import {
 } from '../lib/calc';
 import { generateQueryEmbedding, generateVectorAnalysisComment } from '../lib/gemini';
 import chroma from 'chroma-js';
+import { DimensionPosition } from '../types';
 
 // カラーマップの設定
 const jetMap = chroma.scale('RdBu');
@@ -227,6 +228,8 @@ const SakeStar: React.FC<{
 
 interface GlobeVisualizerProps {
   vectors: TextVector[];
+  dimensionPositions?: DimensionPosition[];
+  onDimensionPositionsCalculated?: (positions: DimensionPosition[]) => void;
 }
 
 // --- 4. メインの地球儀コンポーネント ---
@@ -260,7 +263,8 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
   }, [props.vectors]);
 
   // 1. 各次元 (Vector の各要素) 同士の相関行列を作成し、球面上における基準の相関配置（方向）を計算
-  const dimensionPositions = useMemo(() => {
+  const calculatedDimensionPositions = useMemo(() => {
+    if (props.dimensionPositions?.length) return [];
     if (displayVectors.length === 0) return [];
     const dimCount = displayVectors[0].vector.length;
     if (dimCount === 0) return [];
@@ -287,7 +291,20 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
       }
       return spherePositions;
     }
-  }, [displayVectors]);
+  }, [displayVectors, props.dimensionPositions]);
+
+  const dimensionPositions = useMemo(
+    () =>
+      props.dimensionPositions?.length
+        ? props.dimensionPositions.map(({ x, y, z }) => new THREE.Vector3(x, y, z))
+        : calculatedDimensionPositions,
+    [props.dimensionPositions, calculatedDimensionPositions],
+  );
+
+  useEffect(() => {
+    if (props.dimensionPositions?.length || dimensionPositions.length === 0) return;
+    props.onDimensionPositionsCalculated?.(dimensionPositions.map(({ x, y, z }) => ({ x, y, z })));
+  }, [dimensionPositions, props.dimensionPositions, props.onDimensionPositionsCalculated]);
 
   // 次元の単位方向ベクトル (長さ1に正規化)
   const dimensionUnitVectors = useMemo((): THREE.Vector3[] => {

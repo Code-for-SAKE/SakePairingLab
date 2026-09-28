@@ -91,3 +91,9 @@ export interface NetworkResponse {
   nodes: NetworkNode[];
   links: NetworkLink[];
 }
+
+export interface DimensionPosition {
+  x: number;
+  y: number;
+  z: number;
+}
