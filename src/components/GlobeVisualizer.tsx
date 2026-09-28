@@ -3,7 +3,6 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Html, OrbitControls, Sphere } from '@react-three/drei';
 import * as THREE from 'three';
-import { TextVector } from '../dummyTypes';
 import Matrix from 'ml-matrix';
 import {
   classicalMDS,
@@ -13,7 +12,7 @@ import {
 } from '../lib/calc';
 import { generateQueryEmbedding, generateVectorAnalysisComment } from '../lib/gemini';
 import chroma from 'chroma-js';
-import { DimensionPosition } from '../types';
+import { TextVector, DimensionPosition } from '../types';
 
 // カラーマップの設定
 const jetMap = chroma.scale('RdBu');

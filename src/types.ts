@@ -97,3 +97,11 @@ export interface DimensionPosition {
   y: number;
   z: number;
 }
+
+export type TextVector = {
+  name: string;
+  text: string;
+  url?: string;
+  imageUrl?: string;
+  vector: number[];
+};
