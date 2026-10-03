@@ -91,3 +91,17 @@ export interface NetworkResponse {
   nodes: NetworkNode[];
   links: NetworkLink[];
 }
+
+export interface DimensionPosition {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export type TextVector = {
+  name: string;
+  text: string;
+  url?: string;
+  imageUrl?: string;
+  vector: number[];
+};

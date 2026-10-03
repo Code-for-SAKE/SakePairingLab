@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query, serverTimestamp, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -14,17 +14,42 @@ export default function NewSake() {
   const [bottle, setBottle] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     setLoading(true);
+    setError('');
     try {
+      const normalizedBrewery = brewery.trim();
+      const normalizedBrand = brand.trim();
+      const normalizedBottle = bottle.trim();
+      if (!normalizedBrewery || !normalizedBrand || !normalizedBottle) {
+        setError('酒蔵・銘柄・ボトル詳細を入力してください。');
+        return;
+      }
+
+      const existingSakes = await getDocs(
+        query(
+          collection(db, 'sakes'),
+          where('brewery', '==', normalizedBrewery),
+          where('brand', '==', normalizedBrand),
+          where('bottle', '==', normalizedBottle),
+        ),
+      );
+
+      const existingSake = existingSakes.docs[0];
+      if (existingSake) {
+        setError('この日本酒はすでに登録されています。');
+        return;
+      }
+
       const docRef = await addDoc(collection(db, 'sakes'), {
-        brewery,
-        brand,
-        bottle,
+        brewery: normalizedBrewery,
+        brand: normalizedBrand,
+        bottle: normalizedBottle,
         description,
         createdAt: serverTimestamp(),
         createdBy: user.uid,
@@ -32,6 +57,7 @@ export default function NewSake() {
       navigate(`/sake/${docRef.id}`);
     } catch (error) {
       console.error('Error adding document: ', error);
+      setError('登録に失敗しました。時間をおいてもう一度お試しください。');
     } finally {
       setLoading(false);
     }
@@ -51,6 +77,10 @@ export default function NewSake() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {error && (
+          <p className="text-sm text-amber-700 bg-amber-50 rounded-xl px-4 py-3">{error}</p>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">酒蔵</label>
           <input
@@ -102,7 +132,7 @@ export default function NewSake() {
 
         <button
           type="submit"
-          disabled={loading || !brewery || !brand || !bottle}
+          disabled={loading || !brewery.trim() || !brand.trim() || !bottle.trim()}
           className="w-full bg-indigo-600 text-white py-4 rounded-xl font-medium disabled:opacity-50 flex justify-center items-center shadow-md hover:bg-indigo-700 transition-colors"
         >
           {loading ? '登録中...' : '登録する'}

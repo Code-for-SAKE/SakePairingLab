@@ -1,6 +1,15 @@
 {
   "indexes": [
     {
+      "collectionGroup": "sakes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "brewery", "order": "ASCENDING" },
+        { "fieldPath": "brand", "order": "ASCENDING" },
+        { "fieldPath": "bottle", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "reviews",
       "queryScope": "COLLECTION",
       "fields": [

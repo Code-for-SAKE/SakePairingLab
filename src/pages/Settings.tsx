@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { setUserApiKey, hasUserApiKey } from '../lib/gemini';
+import { AccordionItem } from '../components/AccordionItem';
 
 const DISPLAY_NAME_MAX_LENGTH = 50;
 
@@ -141,7 +142,7 @@ export default function Settings() {
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6">
         <h3 className="font-bold text-slate-900 mb-4">Gemini APIキー設定</h3>
         <p className="text-sm text-slate-500 mb-4 leading-relaxed">
-          投稿時のコメントを自動生成したり、日本酒アート画像を生成するために利用します。
+          投稿時のコメントを自動生成したり、日本酒アート画像を生成するために利用します。ブラウザ内に安全に保存され、サーバには送られません。
           <br />
           <a
             className="text-indigo-400 hover:text-indigo-600 underline transition-colors"
@@ -155,6 +156,35 @@ export default function Settings() {
           <br />
           ただし、アート画像をサイトから生成するには有料のAPIキーが必要です。
         </p>
+        <div className="mb-4 rounded-xl border border-slate-200">
+          <AccordionItem title="無料のGemini APIキーを作成する方法">
+            <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed">
+              <li>
+                <a
+                  className="text-indigo-600 underline hover:text-indigo-700"
+                  href="https://aistudio.google.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Google AI Studio
+                </a>
+                を開き、Googleアカウントでログインします。
+              </li>
+              <li>
+                「Get API key」から「Create API
+                key」を選び、プロジェクトを指定してキーを作成します。
+              </li>
+              <li>作成されたキーをコピーし、この画面の入力欄に貼り付けて「保存」を押します。</li>
+            </ol>
+            <p className="mt-3 text-xs leading-relaxed text-gray-500">
+              無料利用にはモデルごとの使用上限があります。上限や利用条件はGoogle AI
+              Studioでご確認ください。
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-amber-800">
+              取得したAPIキーはパスワードと同様の機密情報です。メモ帳などに貼り付けて大切に保管し、他人に公開しないよう注意してください。
+            </p>
+          </AccordionItem>
+        </div>
         <input
           type="password"
           placeholder="APIキーを入力"

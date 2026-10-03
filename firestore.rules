@@ -52,9 +52,15 @@ service cloud.firestore {
         && data.bottle is string && data.bottle.size() <= 100
         && data.createdBy == request.auth.uid
         && data.createdAt == request.time
+        && isValidSakeImageUrl(data)
         && (
           !('description' in data.keys()) || (data.description is string && data.description.size() <= 1000)
         );
+    }
+
+    function isValidSakeImageUrl(data) {
+      return !('imageUrl' in data.keys())
+        || (data.imageUrl is string && data.imageUrl.size() <= 2048 && data.imageUrl.matches('^https://.+$'));
     }
 
     function isValidReview(data) {
@@ -138,6 +144,10 @@ service cloud.firestore {
       allow get: if true; 
       allow list: if true; // Public catalog
       allow create: if isSignedIn() && isValidId(sakeId) && isValidSake(incoming());
+      allow update: if isSignedIn() && isValidId(sakeId)
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['imageUrl'])
+                    && 'imageUrl' in incoming().keys()
+                    && isValidSakeImageUrl(incoming());
     }
 
     match /reviews/{reviewId} {

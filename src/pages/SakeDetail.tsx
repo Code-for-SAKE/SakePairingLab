@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { PenTool, ChevronLeft, Loader2, Search } from 'lucide-react';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
-import { doc, getDoc, where, orderBy } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, where, orderBy } from 'firebase/firestore';
 import { app, db } from '../lib/firebase';
 import { Sake, Review } from '../types';
 import FirestorePager from '../lib/firestorepager';
@@ -175,6 +175,11 @@ export default function SakeDetail() {
           <SakeFlavorImage
             sakeId={sake.id}
             sakeName={`${sake.brand} ${sake.bottle}(${sake.brewery})`}
+            imageUrl={sake.imageUrl}
+            onImageUrlChange={async (imageUrl) => {
+              await updateDoc(doc(db, 'sakes', sake.id), { imageUrl });
+              setSake((current) => (current ? { ...current, imageUrl } : current));
+            }}
             embedding={sake.embedding?.toArray()}
             editable={true}
           />

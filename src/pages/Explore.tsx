@@ -2,21 +2,42 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, Loader2, Sparkles, RefreshCw, Compass } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '../lib/firebase';
+import { app, db } from '../lib/firebase';
 import { NetworkResponse, Sake } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { generateQueryEmbedding, hasUserApiKey } from '../lib/gemini';
 import { SakeCard } from '../components/SakeCard';
+import { collection, getCountFromServer } from 'firebase/firestore';
+
+const SEARCH_STATE_KEY = 'sake-explore-search-state';
+
+function readSearchState(): { query: string; results: Sake[] | null } {
+  try {
+    const savedState = sessionStorage.getItem(SEARCH_STATE_KEY);
+    if (!savedState) return { query: '', results: null };
+
+    const parsed = JSON.parse(savedState);
+    return {
+      query: typeof parsed.query === 'string' ? parsed.query : '',
+      results: Array.isArray(parsed.results) ? (parsed.results as Sake[]) : null,
+    };
+  } catch {
+    return { query: '', results: null };
+  }
+}
 
 export default function ExplorePage() {
   const { profile } = useAuth();
-  const [query, setQuery] = useState('');
+  const [count, setCount] = useState<number | null>(null);
+  const [query, setQuery] = useState(() => readSearchState().query);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComposing, setIsComposing] = useState(false);
 
   // Vector Search States
-  const [vectorResults, setVectorResults] = useState<Sake[] | null>(null);
+  const [vectorResults, setVectorResults] = useState<Sake[] | null>(
+    () => readSearchState().results,
+  );
   const [isSearchingVector, setIsSearchingVector] = useState(false);
   const [vectorSearchError, setVectorSearchError] = useState<string | null>(null);
 
@@ -39,7 +60,7 @@ export default function ExplorePage() {
         >(functions, 'searchSakesByVector');
 
         const vector = await generateQueryEmbedding(query, 1024);
-        const res = await searchByVector({ queryVector: vector, limit: 5 });
+        const res = await searchByVector({ queryVector: vector, limit: 10 });
         if (isMounted && res.data.results) {
           setVectorResults(res.data.results);
           setIsSearchingVector(false);
@@ -64,7 +85,7 @@ export default function ExplorePage() {
           { success: boolean; results: Sake[] }
         >(functions, 'searchSakesByText');
 
-        const res = await searchSakesByText({ queryText: query, limit: 5 });
+        const res = await searchSakesByText({ queryText: query, limit: 10 });
         if (isMounted && res.data.results) {
           setVectorResults(res.data.results);
           setIsSearchingVector(false);
@@ -83,7 +104,11 @@ export default function ExplorePage() {
     let isMounted = true;
     setLoading(false);
     setError(null);
-
+    const fetchCount = async () => {
+      const snapshot = await getCountFromServer(collection(db, 'sakes'));
+      setCount(snapshot.data().count);
+    };
+    fetchCount();
     return () => {
       isMounted = false;
     };
@@ -107,6 +132,14 @@ export default function ExplorePage() {
       clearTimeout(timer);
     };
   }, [query]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({ query, results: vectorResults }));
+    } catch (storageError) {
+      console.warn('Could not persist sake search state:', storageError);
+    }
+  }, [query, vectorResults]);
 
   const handleSearch = async () => {
     const trimmed = query.trim();
@@ -260,6 +293,8 @@ export default function ExplorePage() {
         )}
       </div>
 
+      <div>総数:{count ?? '-'}件</div>
+
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
           <h2 className="text-lg font-bold text-slate-900">検索結果</h2>
@@ -289,7 +324,9 @@ export default function ExplorePage() {
       ) : (
         <div className="space-y-3">
           {displayList.map((sake) => (
-            <SakeCard sake={sake} isUsingVectorSearch={isUsingVectorSearch} />
+            <div key={sake.id}>
+              <SakeCard sake={sake} isUsingVectorSearch={isUsingVectorSearch} />
+            </div>
           ))}
           {displayList.length === 0 && (
             <div className="text-center py-12 text-slate-500">
