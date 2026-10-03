@@ -21,26 +21,6 @@ db.settings({ ignoreUndefinedProperties: true });
 
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
-const QUEST_TEMPERATURE_OPTIONS = [
-  '雪冷え (5℃)',
-  '花冷え (10℃)',
-  '涼冷え (15℃)',
-  '常温 (20℃)',
-  'ぬる燗 (40℃)',
-  '上燗 (45℃)',
-  '熱燗 (50℃)',
-  '飛び切り燗 (55℃〜)',
-];
-
-const QUEST_PAIRING_OPTIONS = [
-  '白身魚の刺身',
-  '和牛ステーキ',
-  'ハードチーズ',
-  'うなぎの蒲焼き',
-  '焼き鳥（タレ）',
-  '塩辛',
-];
-
 function resolveApiKey(): string {
   try {
     return geminiApiKey.value();
@@ -109,26 +89,6 @@ function getMeanVector(embeddings: number[][]): number[] {
   }
 
   return meanVector.map((sum) => sum / embeddings.length);
-}
-
-function toNumberArray(value: unknown): number[] {
-  if (Array.isArray(value)) return value.filter((item): item is number => typeof item === 'number');
-  return (value as { toArray?: () => number[] } | undefined)?.toArray?.() || [];
-}
-
-function cosineDistance(left: number[], right: number[]): number {
-  let dot = 0;
-  let leftNorm = 0;
-  let rightNorm = 0;
-
-  for (let index = 0; index < left.length; index++) {
-    dot += left[index] * right[index];
-    leftNorm += left[index] ** 2;
-    rightNorm += right[index] ** 2;
-  }
-
-  if (leftNorm === 0 || rightNorm === 0) return 1;
-  return 1 - dot / Math.sqrt(leftNorm * rightNorm);
 }
 
 /**

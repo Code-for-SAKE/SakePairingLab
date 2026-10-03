@@ -160,7 +160,6 @@ export default function NewQuest() {
     setRecommending(true);
     try {
       let reviewquery = query(collection(db, 'reviews'));
-      debugger;
       if (selectedSake) {
         reviewquery = query(reviewquery, where('sakeId', '==', selectedSake.id));
       }
@@ -172,8 +171,12 @@ export default function NewQuest() {
           reviewEmbeddings.push(review.embedding?.toArray().slice(0, 1024));
         }
       });
-      if (reviewEmbeddings.length < 0) {
-        throw new Error('ランダムレビューが見つかりませんでした。');
+      if (reviewEmbeddings.length === 0) {
+        throw new Error(
+          selectedSake
+            ? `「${selectedSake.brand}」のレビューデータが見つかりませんでした。どんな条件でも新たなペアリングを見つけるチャンスがあります。`
+            : 'レビューデータが見つかりませんでした。どんな条件でも新たなペアリングを見つけるチャンスがあります。',
+        );
       }
       const start = performance.now();
       // 3箇所の空洞を、100回ループで計算
@@ -190,7 +193,9 @@ export default function NewQuest() {
       >(functions, 'searchSakesByVector');
 
       if (voids.length == 0) {
-        throw new Error('おすすめ空洞範囲が見つかりませんでした。');
+        throw new Error(
+          'おすすめ空洞範囲が見つかりませんでした。どんな条件でも新たなペアリングを見つけるチャンスがあります。',
+        );
       }
       // 空洞にあたるレビュー条件を出力
       const recommend = await generateRecommendQuest(voids[0], {
@@ -205,7 +210,9 @@ export default function NewQuest() {
       });
       console.log(recommend);
       if (!recommend) {
-        throw new Error('おすすめ候補が見つかりませんでした。');
+        throw new Error(
+          'おすすめ候補が見つかりませんでした。どんな条件でも新たなペアリングを見つけるチャンスがあります。',
+        );
       }
       //日本酒のおすすめを設定
       if (!selectedSake && recommend.sakeCharacter) {
@@ -224,7 +231,10 @@ export default function NewQuest() {
       setDescription(recommend.recommendComment ?? '');
     } catch (err: any) {
       console.error('Error recommending quest conditions:', err);
-      alert(err.message || 'おすすめの取得に失敗しました。');
+      alert(
+        err.message ||
+          'おすすめの取得に失敗しました。どんな条件でも新たなペアリングを見つけるチャンスがあります。',
+      );
     } finally {
       setRecommending(false);
     }

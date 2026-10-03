@@ -28,7 +28,7 @@ export async function getRandomDocuments<T>(
   targetCount = 100,
   limitCount = 10,
 ) {
-  const resultDocs = new Map(); // 重複排除とデータ保持用 (ID -> Data)
+  const resultDocs = new Map<string, any>(); // 重複排除とデータ保持用 (ID -> Data)
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
   let emptyAttempts = 0; // 新しいデータが取れなかった連続回数
@@ -41,44 +41,53 @@ export async function getRandomDocuments<T>(
       chars.charAt(Math.floor(Math.random() * chars.length)) +
       chars.charAt(Math.floor(Math.random() * chars.length));
 
-    // その文字列以降から最大5件をサンプリング
-    const q = query(conditionQuery, orderBy('__name__'), startAt(randomPrefix), limit(limitCount));
+    try {
+      // その文字列以降から最大件数をサンプリング
+      const q = query(
+        conditionQuery,
+        orderBy('__name__'),
+        startAt(randomPrefix),
+        limit(limitCount),
+      );
 
-    const snapshot = await getDocs(q);
-    let addedInThisLoop = 0;
+      const snapshot = await getDocs(q);
+      let addedInThisLoop = 0;
 
-    snapshot.forEach((doc) => {
-      if (!resultDocs.has(doc.id)) {
-        resultDocs.set(doc.id, doc.data());
-        addedInThisLoop++;
+      snapshot.forEach((doc) => {
+        if (!resultDocs.has(doc.id)) {
+          resultDocs.set(doc.id, doc.data());
+          addedInThisLoop++;
+        }
+      });
+
+      // 新しいデータが1件も増えなかったら、空振りカウンターを増やす
+      if (addedInThisLoop === 0) {
+        emptyAttempts++;
+      } else {
+        emptyAttempts = 0; // データが取れたらカウンターをリセット
       }
-    });
-
-    // 新しいデータが1件も増えなかったら、空振りカウンターを増やす
-    if (addedInThisLoop === 0) {
-      emptyAttempts++;
-    } else {
-      emptyAttempts = 0; // データが取れたらカウンターをリセット
+    } catch (err) {
+      console.warn('Random prefix sampling not applicable or failed for query:', err);
+      break;
     }
   }
 
-  // --- ステップ2: レコード数が100件に満たなかった場合のフォールバック ---
+  // --- ステップ2: レコード数が満たなかった場合の補填 ---
+  // (条件付きクエリやデータ数が少ない場合は、conditionQueryから直接取得して不足分を補う)
   if (resultDocs.size < targetCount) {
-    console.log(`データが足りないため(現在${resultDocs.size}件)、先頭から補填します。`);
+    try {
+      const needed = targetCount - resultDocs.size;
+      const fallbackQ = query(conditionQuery, limit(needed));
+      const fallbackSnapshot = await getDocs(fallbackQ);
 
-    // コレクションの先頭から必要な分（最大100件）を普通に取得
-    const fallbackQ = query(
-      collection(db, 'your_collection'),
-      orderBy('__name__'),
-      limit(targetCount),
-    );
-
-    const fallbackSnapshot = await getDocs(fallbackQ);
-    fallbackSnapshot.forEach((doc) => {
-      if (resultDocs.size < targetCount) {
-        resultDocs.set(doc.id, doc.data());
-      }
-    });
+      fallbackSnapshot.forEach((doc) => {
+        if (!resultDocs.has(doc.id)) {
+          resultDocs.set(doc.id, doc.data());
+        }
+      });
+    } catch (err) {
+      console.error('Error fetching fallback documents for query:', err);
+    }
   }
 
   // Mapから配列に変換して返す
