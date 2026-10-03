@@ -13,7 +13,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { query, collection, addDoc, serverTimestamp, where } from 'firebase/firestore';
 import { app, db, getRandomDocuments } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Review, Sake } from '../types';
@@ -159,7 +159,11 @@ export default function NewQuest() {
   const handleRecommend = async () => {
     setRecommending(true);
     try {
-      const reviews = await getRandomDocuments<Review>('reviews', 5, 2);
+      let reviewquery = query(collection(db, 'reviews'));
+      if (selectedSake) {
+        reviewquery = query(reviewquery, where('sakeId', '==', selectedSake.id));
+      }
+      const reviews = await getRandomDocuments<Review>(reviewquery, 5, 2);
       const reviewEmbeddings: number[][] = [];
       reviews.map((review) => {
         if (review.embedding) {
@@ -167,8 +171,12 @@ export default function NewQuest() {
           reviewEmbeddings.push(review.embedding?.toArray().slice(0, 1024));
         }
       });
-      if (reviewEmbeddings.length < 0) {
-        throw new Error('ランダムレビューが見つかりませんでした。');
+      if (reviewEmbeddings.length === 0) {
+        throw new Error(
+          selectedSake
+            ? `「${selectedSake.brand}」のレビューデータが見つかりませんでした。どんな条件でも新たなペアリングを見つけるチャンスがあります。`
+            : 'レビューデータが見つかりませんでした。どんな条件でも新たなペアリングを見つけるチャンスがあります。',
+        );
       }
       const start = performance.now();
       // 3箇所の空洞を、100回ループで計算
@@ -185,7 +193,9 @@ export default function NewQuest() {
       >(functions, 'searchSakesByVector');
 
       if (voids.length == 0) {
-        throw new Error('おすすめ空洞範囲が見つかりませんでした。');
+        throw new Error(
+          'おすすめ空洞範囲が見つかりませんでした。どんな条件でも新たなペアリングを見つけるチャンスがあります。',
+        );
       }
       // 空洞にあたるレビュー条件を出力
       const recommend = await generateRecommendQuest(voids[0], {
@@ -200,7 +210,9 @@ export default function NewQuest() {
       });
       console.log(recommend);
       if (!recommend) {
-        throw new Error('おすすめ候補が見つかりませんでした。');
+        throw new Error(
+          'おすすめ候補が見つかりませんでした。どんな条件でも新たなペアリングを見つけるチャンスがあります。',
+        );
       }
       //日本酒のおすすめを設定
       if (!selectedSake && recommend.sakeCharacter) {
@@ -219,7 +231,10 @@ export default function NewQuest() {
       setDescription(recommend.recommendComment ?? '');
     } catch (err: any) {
       console.error('Error recommending quest conditions:', err);
-      alert(err.message || 'おすすめの取得に失敗しました。');
+      alert(
+        err.message ||
+          'おすすめの取得に失敗しました。どんな条件でも新たなペアリングを見つけるチャンスがあります。',
+      );
     } finally {
       setRecommending(false);
     }
