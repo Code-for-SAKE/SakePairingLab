@@ -13,11 +13,11 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { app, db, getRandomDocuments } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Review, Sake } from '../types';
-import { generateQueryEmbedding, generateRecommendQuest } from '../lib/gemini';
+import { generateQueryEmbedding, generateRecommendQuest, hasUserApiKey } from '../lib/gemini';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { findVoidVectorsPure } from '../lib/calc';
 
@@ -48,7 +48,7 @@ export default function NewQuest() {
   const { user } = useAuth();
 
   const [sakes, setSakes] = useState<Sake[]>([]);
-  const [loadingSakes, setLoadingSakes] = useState(true);
+  const [loadingSakes, setLoadingSakes] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSake, setSelectedSake] = useState<Sake | null>(null);
 
@@ -61,20 +61,56 @@ export default function NewQuest() {
   const [recommending, setRecommending] = useState(false);
 
   useEffect(() => {
-    const fetchSakes = async () => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSakes([]);
+      setLoadingSakes(false);
+      return;
+    }
+
+    let active = true;
+    setLoadingSakes(true);
+
+    const timer = setTimeout(async () => {
       try {
-        setLoadingSakes(true);
-        const snap = await getDocs(collection(db, 'sakes'));
-        const list = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Sake);
-        setSakes(list);
+        const functions = getFunctions(app);
+        if (hasUserApiKey()) {
+          const searchByVector = httpsCallable<
+            { queryVector: number[]; limit?: number },
+            { success: boolean; results: Sake[] }
+          >(functions, 'searchSakesByVector');
+          const vector = await generateQueryEmbedding(trimmed, 1024);
+          const res = await searchByVector({ queryVector: vector, limit: 10 });
+          if (active) {
+            setSakes(res.data.results || []);
+          }
+        } else {
+          const searchSakesByText = httpsCallable<
+            { queryText: string; limit?: number },
+            { success: boolean; results: Sake[] }
+          >(functions, 'searchSakesByText');
+          const res = await searchSakesByText({ queryText: trimmed, limit: 10 });
+          if (active) {
+            setSakes(res.data.results || []);
+          }
+        }
       } catch (err) {
-        console.error('Error fetching sakes:', err);
+        console.error('Error searching sakes:', err);
+        if (active) {
+          setSakes([]);
+        }
       } finally {
-        setLoadingSakes(false);
+        if (active) {
+          setLoadingSakes(false);
+        }
       }
+    }, 400);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
     };
-    fetchSakes();
-  }, []);
+  }, [searchQuery]);
 
   const handleSelectSake = (sake: Sake) => {
     setSelectedSake(sake);
@@ -107,13 +143,6 @@ export default function NewQuest() {
       setTitle(`【${val}】で開花するペアリングを探せ`);
     }
   };
-
-  const filteredSakes = sakes.filter(
-    (s) =>
-      s.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.brewery.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.bottle.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
 
   // ポイントの自動計算（ユーザー指定不可）
   const calculatePoints = () => {
@@ -173,7 +202,6 @@ export default function NewQuest() {
       if (!recommend) {
         throw new Error('おすすめ候補が見つかりませんでした。');
       }
-      debugger;
       //日本酒のおすすめを設定
       if (!selectedSake && recommend.sakeCharacter) {
         const vector = await generateQueryEmbedding(recommend.sakeCharacter, 1024);
@@ -358,15 +386,15 @@ export default function NewQuest() {
                   (loadingSakes ? (
                     <div className="flex items-center justify-center py-4 text-slate-400">
                       <Loader2 className="w-4 h-4 animate-spin mr-2 text-indigo-600" />
-                      <span className="text-xs">日本酒データを読み込み中...</span>
+                      <span className="text-xs">日本酒を検索中...</span>
                     </div>
-                  ) : filteredSakes.length === 0 ? (
+                  ) : sakes.length === 0 ? (
                     <div className="text-center py-4 text-slate-400 text-xs">
                       該当する日本酒が見つかりません
                     </div>
                   ) : (
                     <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 border border-slate-100 rounded-xl p-2 bg-slate-50">
-                      {filteredSakes.map((sake) => (
+                      {sakes.map((sake) => (
                         <button
                           key={sake.id}
                           type="button"
