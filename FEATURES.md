@@ -108,8 +108,8 @@ Gemini API による埋め込み（Embedding）生成と Firestore のベクト�
 
 ### 2.8 バックエンド & 管理者機能 (Cloud Functions)
 
-- **`onSakeWrite` (Firestore トリガー)**:
-  - 日本酒ドキュメントの新規作成・更新時に自動実行
+- **`onSakeCreated` (Firestore トリガー)**:
+  - 日本酒ドキュメントの新規作成時に自動実行
   - スペックテキストから Gemini で1024次元ベクトル（`gemini-embedding-001`）を生成し、`FieldValue.vector` として保存
 - **`onReviewCreated` (Firestore トリガー)**:
   - レビュー投稿時に自動実行

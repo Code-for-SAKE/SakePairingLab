@@ -1,7 +1,6 @@
 import {
-  onDocumentWritten,
+  onDocumentCreated,
   FirestoreEvent,
-  Change,
   DocumentSnapshot,
 } from 'firebase-functions/v2/firestore';
 import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
@@ -9,7 +8,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { GoogleGenAI } from '@google/genai';
-import { NetworkLink, NetworkNode, NetworkResponse, Review, Sake } from './type';
+import { NetworkLink, NetworkNode, NetworkResponse, Review, Sake, TasteProfile } from './type';
 import { kmeans } from 'ml-kmeans';
 
 if (getApps().length === 0) {
@@ -60,6 +59,17 @@ function buildSakeText(sake: Sake): string {
   return `銘柄: ${brand}, 酒蔵: ${brewery}, 種別: ${bottle}, 特徴: ${description}`.trim();
 }
 
+function formatTasteProfile(profile?: TasteProfile | string): string {
+  if (!profile) return '';
+  if (typeof profile === 'string') return profile;
+  const parts = [
+    ...(profile.broads || []),
+    ...(profile.specific || []),
+    profile.custom || '',
+  ].filter(Boolean);
+  return parts.join(', ');
+}
+
 async function checkIsAdmin(auth: any): Promise<boolean> {
   if (!auth?.uid) return false;
   if (auth.token?.admin === true) return true;
@@ -92,36 +102,26 @@ function getMeanVector(embeddings: number[][]): number[] {
 }
 
 /**
- * Triggered automatically when a Sake document is created or updated.
+ * Triggered automatically when a Sake document is created.
  * Generates embedding using Gemini models/gemini-embedding-001 and updates document with FieldValue.vector and updatedAt.
  */
-export const onSakeWrite = onDocumentWritten(
+export const onSakeCreated = onDocumentCreated(
   {
     document: 'sakes/{sakeId}',
     secrets: [geminiApiKey],
   },
-  async (event: FirestoreEvent<Change<DocumentSnapshot> | undefined, { sakeId: string }>) => {
-    const afterSnap = event.data?.after;
-    if (!afterSnap || !afterSnap.exists) {
+  async (event: FirestoreEvent<DocumentSnapshot | undefined, { sakeId: string }>) => {
+    const snap = event.data;
+    if (!snap || !snap.exists) {
       return;
     }
 
-    const beforeData = event.data?.before?.data();
-    const afterData = afterSnap.data() as Sake | undefined;
+    const data = snap.data() as Sake | undefined;
+    if (!data) return;
 
-    if (!afterData) return;
-
-    // Prevent infinite loop if update was only embedding/updatedAt
-    if (beforeData) {
-      const contentChanged =
-        beforeData.brand !== afterData?.brand ||
-        beforeData.brewery !== afterData?.brewery ||
-        beforeData.bottle !== afterData?.bottle ||
-        beforeData.description !== afterData?.description;
-
-      if (!contentChanged && afterData?.embedding) {
-        return;
-      }
+    // 二重実行防止: すでに embedding が設定されている場合はスキップ
+    if (data.embedding) {
+      return;
     }
 
     const apiKey = resolveApiKey();
@@ -130,14 +130,14 @@ export const onSakeWrite = onDocumentWritten(
       return;
     }
 
-    const sakeText = buildSakeText(afterData);
+    const sakeText = buildSakeText(data);
     if (!sakeText) return;
 
     try {
       const ai = new GoogleGenAI({ apiKey });
       const vectorValues = await generateEmbedding(ai, sakeText, 1024);
 
-      await afterSnap.ref.update({
+      await snap.ref.update({
         embedding: FieldValue.vector(vectorValues),
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -148,14 +148,14 @@ export const onSakeWrite = onDocumentWritten(
   },
 );
 
-// レビュー追加時に動くFunctionsのイメージ
-export const onReviewCreated = onDocumentWritten(
+// レビュー作成時のみ実行（新規作成時のみトリガーされるため無限ループを防止）
+export const onReviewCreated = onDocumentCreated(
   {
     document: 'reviews/{reviewId}',
     secrets: [geminiApiKey],
   },
-  async (event: FirestoreEvent<Change<DocumentSnapshot> | undefined, { reviewId: string }>) => {
-    const reviewSnap = event.data?.after;
+  async (event: FirestoreEvent<DocumentSnapshot | undefined, { reviewId: string }>) => {
+    const reviewSnap = event.data;
     if (!reviewSnap || !reviewSnap.exists) {
       return;
     }
@@ -163,28 +163,9 @@ export const onReviewCreated = onDocumentWritten(
     const reviewData = reviewSnap.data() as Review | undefined;
     if (!reviewData) return;
 
-    const afterSnap = event.data?.after;
-    if (!afterSnap || !afterSnap.exists) {
+    // 二重実行防止: すでに embedding が設定されている場合はスキップ
+    if (reviewData.embedding) {
       return;
-    }
-
-    const beforeData = event.data?.before?.data();
-
-    // Prevent infinite loop if update was only embedding/updatedAt
-    if (beforeData) {
-      const contentChanged =
-        beforeData.aroma !== reviewData?.aroma ||
-        beforeData.comment !== reviewData?.comment ||
-        beforeData.pairing !== reviewData?.pairing ||
-        beforeData.rating !== reviewData?.rating ||
-        beforeData.taste !== reviewData?.taste ||
-        beforeData.temperature !== reviewData?.temperature ||
-        beforeData.userId !== reviewData?.userId ||
-        beforeData.vessel !== reviewData?.vessel;
-
-      if (!contentChanged && reviewData?.embedding) {
-        return;
-      }
     }
 
     // 1. sakesコレクションから、お酒のembeddingを取得する
@@ -204,24 +185,26 @@ export const onReviewCreated = onDocumentWritten(
 
     // 2. 前半 1024次元 (context) のテキストを作成
     // お酒のスペック ＋ 温度 ＋ 酒器 ＋ おつまみ
-    const contextText = `${sakeText} 温度:${reviewData.temperature} 酒器:${reviewData.vessel} おつまみ:${reviewData.pairing}`;
+    const contextText = `${sakeText} 温度:${reviewData.temperature || ''} 酒器:${reviewData.vessel || ''} おつまみ:${reviewData.pairing || ''}`;
     const environmentVector1024 = await generateEmbedding(ai, contextText, 1024);
 
-    // 【ここが変化！】お酒のベクトルと環境のベクトルをブレンド（例: 7:3 や 5:5）して前半のcontextとする
-    const alpha = 0.5; // お酒本来の個性を高めに維持するブレンド比率
+    // お酒のベクトルと環境のベクトルをブレンド（5:5）して前半のcontextとする
+    const alpha = 0.5;
     const contextVector1024 = sakeEmbedding.map((val, idx) => {
       return alpha * val + (1 - alpha) * environmentVector1024[idx];
     });
 
     // 3. 後半 1024次元 (result) のテキストを作成
-    // 味わい ＋ 香り ＋ 相性
-    const resultText = `香り:${reviewData.aroma} 味わい:${reviewData.taste} 相性:${reviewData.rating}`;
+    // 味わい ＋ 香り ＋ 相性 ＋ コメント
+    const aromaText = formatTasteProfile(reviewData.aroma);
+    const tasteText = formatTasteProfile(reviewData.taste);
+    const resultText = `香り:${aromaText} 味わい:${tasteText} 相性:${reviewData.rating || ''} コメント:${reviewData.comment || ''}`;
     const resultVector1024 = await generateEmbedding(ai, resultText, 1024);
 
     // 4. 2つを結合して2048次元にする
     const embedding = [...contextVector1024, ...resultVector1024];
 
-    // 5. reviewsドキュメントに保存
+    // 5. reviewsドキュメントに保存（onDocumentCreated のため再発火しません）
     await reviewSnap.ref.update({
       embedding: FieldValue.vector(embedding),
       updatedAt: FieldValue.serverTimestamp(),
