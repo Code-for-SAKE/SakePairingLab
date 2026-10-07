@@ -1,11 +1,18 @@
 import { VectorValue } from 'firebase/firestore';
 
+export type UserTasteProfile = {
+  biasVector?: number[]; // 1024次元の世間平均との差分平均ベクトル
+  reviewCount: number;
+  updatedAt?: any;
+};
+
 export type UserProfile = {
   id: string;
   displayName: string;
   photoURL: string;
   title: string;
   contributionScore: number;
+  tasteProfile?: UserTasteProfile;
   tastePreferences?: any;
   role: 'user' | 'admin';
 };

@@ -28,7 +28,13 @@ import { ReviewCard } from '../components/ReviewCard';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import { generateUserTasteAnalysis } from '../lib/gemini';
 
-const TASTE_CATEGORIES = ['フルーティ', 'スッキリ・軽快', '熟成', 'ふくよか・旨味', '酸味', '甘味'];
+import {
+  DEFAULT_TASTE_CATEGORIES,
+  downloadCategoryVectorsJson,
+  getCategoryEmbeddings,
+  projectBiasVectorToCategories,
+  regenerateCategoryVectors,
+} from '../lib/tasteCategories';
 
 export default function MyPage() {
   const { user, profile, signInWithGoogle, logout } = useAuth();
@@ -39,11 +45,27 @@ export default function MyPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [categoryVectorMap, setCategoryVectorMap] = useState<Map<string, number[]>>(new Map());
+
+  const [isRebuilding, setIsRebuilding] = useState(false);
 
   // AI文章分析用のState
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiAnalysisResult, setAiAnalysisResult] = useState('');
   const [analysisError, setAnalysisError] = useState('');
+
+  // カテゴリベクトルの取得・キャッシュロード
+  useEffect(() => {
+    let isMounted = true;
+    getCategoryEmbeddings(DEFAULT_TASTE_CATEGORIES)
+      .then((map) => {
+        if (isMounted) setCategoryVectorMap(map);
+      })
+      .catch((err) => console.error('Error loading category embeddings:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -86,181 +108,28 @@ export default function MyPage() {
     setLoadingMore(false);
   };
 
-  // --- 💡 日本酒ごとにレビューをグループ化し、世間平均評価との差分ベクトルを計算 ---
+  // --- 💡 ユーザープロファイルに保存された差分ベクトル (1024次元) をカテゴリ群に射影して高速分析 ---
   const tasteBiasAnalysis = useMemo(() => {
-    if (reviews.length === 0)
+    const rawBiasVector = profile?.tasteProfile?.biasVector;
+    const hasBiasVector = Array.isArray(rawBiasVector) && rawBiasVector.length > 0;
+
+    if (!hasBiasVector || categoryVectorMap.size === 0) {
       return { chartData: [], topDeviations: [], summary: '', userPreferenceVector: [] };
-
-    // 1. 日本酒ごとにユーザーのレビューをグループ化
-    const sakeReviewMap = new Map<
-      string,
-      {
-        sakeId: string;
-        sake?: any;
-        reviews: Review[];
-        userVector?: number[];
-        baseVector?: number[];
-        diffVector?: number[];
-      }
-    >();
-    reviews.forEach((r) => {
-      const key = r.sakeId || r.sake?.brand || 'unknown';
-      let group = sakeReviewMap.get(key);
-      if (!group) {
-        group = { sakeId: key, sake: r.sake, reviews: [] };
-        sakeReviewMap.set(key, group);
-      }
-      group.reviews.push(r);
-    });
-
-    // ベクトル変換ヘルパー
-    const extractVector = (embedding: any): number[] | null => {
-      if (!embedding) return null;
-      if (Array.isArray(embedding)) return embedding;
-      if (typeof embedding.toArray === 'function') return embedding.toArray();
-      if (Array.isArray(embedding.values)) return embedding.values;
-      return null;
-    };
-
-    // 2. 日本酒ごとのレビュー r.embedding の平均を計算して userReviewsForSake.userVector に格納
-    sakeReviewMap.forEach((userReviewsForSake) => {
-      const validEmbeddings: number[][] = [];
-      userReviewsForSake.reviews.forEach((r) => {
-        const vec = extractVector(r.embedding);
-        if (vec && vec.length > 0) {
-          validEmbeddings.push(vec);
-        }
-      });
-
-      if (validEmbeddings.length > 0) {
-        const dim = validEmbeddings[0].length;
-        const sumVec = new Array(dim).fill(0);
-        validEmbeddings.forEach((v) => {
-          for (let i = 0; i < dim; i++) {
-            sumVec[i] += v[i];
-          }
-        });
-        // r.embedding の平均を userVector に格納
-        userReviewsForSake.userVector = sumVec.map((val) => val / validEmbeddings.length);
-      }
-
-      // 日本酒自体のベースベクトルを抽出
-      if (userReviewsForSake.sake?.embedding) {
-        userReviewsForSake.baseVector =
-          extractVector(userReviewsForSake.sake.embedding) ?? undefined;
-      }
-
-      // userVector と baseVector の差分ベクトル diffVector を計算
-      if (
-        userReviewsForSake.userVector &&
-        userReviewsForSake.baseVector &&
-        userReviewsForSake.userVector.length === userReviewsForSake.baseVector.length
-      ) {
-        userReviewsForSake.diffVector = userReviewsForSake.userVector.map(
-          (val, idx) => val - userReviewsForSake.baseVector![idx],
-        );
-      }
-    });
-
-    // 💡 【ユーザー志向ベクトルの作成】sakeReviewMap の全 diffVector を平均化
-    const validDiffVectors: number[][] = [];
-    sakeReviewMap.forEach((userReviewsForSake) => {
-      if (userReviewsForSake.diffVector && userReviewsForSake.diffVector.length > 0) {
-        validDiffVectors.push(userReviewsForSake.diffVector);
-      }
-    });
-
-    let userPreferenceVector: number[] = [];
-    if (validDiffVectors.length > 0) {
-      const dim = validDiffVectors[0].length;
-      const sumDiff = new Array(dim).fill(0);
-      validDiffVectors.forEach((diff) => {
-        for (let i = 0; i < dim; i++) {
-          sumDiff[i] += diff[i];
-        }
-      });
-      userPreferenceVector = sumDiff.map((val) => val / validDiffVectors.length);
     }
 
-    // 3. 日本酒ごとのユーザーの評価平均ベクトルをもとにカテゴリー偏りを計算
-    const sakeDeviations: { [cat: string]: number[] } = {};
-    TASTE_CATEGORIES.forEach((cat) => (sakeDeviations[cat] = []));
+    const { chartData, topDeviations, summary } = projectBiasVectorToCategories(
+      rawBiasVector,
+      DEFAULT_TASTE_CATEGORIES,
+      categoryVectorMap,
+    );
 
-    sakeReviewMap.forEach((userReviewsForSake) => {
-      const userCounts: { [cat: string]: number } = {};
-      TASTE_CATEGORIES.forEach((cat) => (userCounts[cat] = 0));
-
-      userReviewsForSake.reviews.forEach((r) => {
-        const words = [...(r.aroma?.broads || []), ...(r.taste?.broads || [])];
-        words.forEach((b) => {
-          if (b === 'スッキリ') userCounts['スッキリ・軽快'] += 1;
-          else if (b === 'ふくよか') userCounts['ふくよか・旨味'] += 1;
-          else if (userCounts[b] !== undefined) userCounts[b] += 1;
-        });
-      });
-
-      // レビュー件数で正規化
-      const totalWords = Object.values(userCounts).reduce((a, b) => a + b, 0) || 1;
-      const userProfileForSake: { [cat: string]: number } = {};
-      TASTE_CATEGORIES.forEach((cat) => {
-        userProfileForSake[cat] = userCounts[cat] / totalWords;
-      });
-
-      // 世間一般の基準 (均等ベースライン 1/6 ≈ 0.167)
-      const baseStandard = 1 / TASTE_CATEGORIES.length;
-
-      // 差分ベクトル ΔV_sake = UserProfile - BaseStandard
-      TASTE_CATEGORIES.forEach((cat) => {
-        const delta = userProfileForSake[cat] - baseStandard;
-        sakeDeviations[cat].push(delta);
-      });
-    });
-
-    // 3. 全評価銘柄での平均差分ベクトル（ユーザー固有の感覚・好みの偏り）を求める
-    const meanDeviations: { [cat: string]: number } = {};
-    const sakeCount = sakeReviewMap.size;
-
-    TASTE_CATEGORIES.forEach((cat) => {
-      const deltas = sakeDeviations[cat];
-      const avgDelta = deltas.reduce((a, b) => a + b, 0) / (deltas.length || 1);
-      meanDeviations[cat] = avgDelta;
-    });
-
-    // 4. RadarChart 用データセットの構築（世間一般基準=50、ユーザー=50 + 偏り）
-    const chartData = TASTE_CATEGORIES.map((cat) => {
-      const delta = meanDeviations[cat] || 0;
-      // 差分を 0 ~ 100 スケールにマッピング (+0.3の偏りで80, -0.3の偏りで20)
-      const userScore = Math.max(10, Math.min(90, Math.round(50 + delta * 120)));
-      return {
-        subject: cat,
-        世間一般: 50,
-        あなたの感度: userScore,
-        rawDelta: delta,
-      };
-    });
-
-    // 5. 偏差が大きい項目の抽出
-    const sortedDevs = TASTE_CATEGORIES.map((cat) => ({
-      category: cat,
-      deviationScore: (meanDeviations[cat] || 0) * 100,
-      description:
-        meanDeviations[cat] > 0.05
-          ? '一般評価より強く感じ取りやすい・好む'
-          : meanDeviations[cat] < -0.05
-            ? '一般評価より控えめに感じやすい'
-            : '一般平均と同等の感受性',
-    })).sort((a, b) => Math.abs(b.deviationScore) - Math.abs(a.deviationScore));
-
-    const topDevs = sortedDevs.slice(0, 3);
-    const summary = topDevs
-      .map(
-        (d) =>
-          `${d.category}: 世間平均に対し ${d.deviationScore > 0 ? '+' : ''}${d.deviationScore.toFixed(1)}pt の偏差`,
-      )
-      .join(' / ');
-
-    return { chartData, topDeviations: topDevs, summary, userPreferenceVector };
-  }, [reviews]);
+    return {
+      chartData,
+      topDeviations,
+      summary,
+      userPreferenceVector: rawBiasVector,
+    };
+  }, [profile?.tasteProfile?.biasVector, categoryVectorMap]);
 
   // --- AI文章解説の実行 ---
   const handleAnalyzeTasteWithGemini = async () => {
@@ -277,7 +146,7 @@ export default function MyPage() {
 
       const comment = await generateUserTasteAnalysis({
         userName: profile?.displayName || 'ユーザー',
-        reviewCount: reviews.length,
+        reviewCount: profile?.tasteProfile?.reviewCount || reviews.length,
         userPreferenceVector: tasteBiasAnalysis.userPreferenceVector,
         sampleReviews: sampleComments,
       });
@@ -288,6 +157,21 @@ export default function MyPage() {
       setAnalysisError(err.message || 'Geminiによる味覚分析に失敗しました。');
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  // --- 管理者用: カテゴリベクトルの再生成 ---
+  const handleCategoryVectorRebuild = async () => {
+    if (!profile || profile.role !== 'admin') return;
+
+    setIsRebuilding(true);
+    try {
+      const data = await regenerateCategoryVectors();
+      downloadCategoryVectorsJson(data);
+    } catch (error) {
+      console.error('Error occurred while rebuilding category vectors:', error);
+    } finally {
+      setIsRebuilding(false);
     }
   };
 
@@ -353,10 +237,30 @@ export default function MyPage() {
           </div>
           <div className="text-center">
             <p className="text-slate-500 mb-1">レビュー</p>
-            <p className="font-bold text-slate-900 text-lg">{reviews.length}</p>
+            <p className="font-bold text-slate-900 text-lg">
+              {profile?.tasteProfile?.reviewCount ?? reviews.length}
+            </p>
           </div>
         </div>
       </div>
+      {profile?.role === 'admin' && (
+        <div className="bg-rose-50 text-rose-700 p-4 rounded-xl mb-6 text-sm font-medium border border-rose-100">
+          <p>⚠️ 管理者アカウントでログイン中です。</p>
+          <p className="mt-1">
+            <button
+              onClick={handleCategoryVectorRebuild}
+              disabled={isRebuilding}
+              className="inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer"
+              title="管理者用: 全Embedding再生成"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 mr-1 ${isRebuilding ? 'animate-spin text-indigo-600' : ''}`}
+              />
+              {isRebuilding ? '再生成中...' : 'カテゴリベクトル更新'}
+            </button>
+          </p>
+        </div>
+      )}
 
       {/* --- 世間基準からのベクトル差分に基づく味覚感度・好みの傾向チャート --- */}
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6">
@@ -370,11 +274,11 @@ export default function MyPage() {
           投稿した日本酒ごとの感想と、世間一般の平均評価ベクトルとの差分を集計・平均化し、あなたが感じ取りやすい特徴や好みの偏りを炙り出しています。
         </p>
 
-        {loading ? (
+        {loading && !profile?.tasteProfile?.biasVector ? (
           <div className="py-12 flex justify-center text-indigo-600">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
-        ) : reviews.length === 0 ? (
+        ) : tasteBiasAnalysis.chartData.length === 0 ? (
           <div className="text-center py-8 text-slate-400">
             <p className="text-sm mb-4">
               まだレビューがありません。
@@ -424,7 +328,8 @@ export default function MyPage() {
             </div>
 
             <p className="text-xs text-slate-500 text-center mt-1 leading-relaxed">
-              {reviews.length}件のレビューの差分平均ベクトルから算出（中心の破線=世間平均基準）
+              {profile?.tasteProfile?.reviewCount ?? reviews.length}
+              件のレビューの差分平均ベクトルから算出（中心の破線=世間平均基準）
             </p>
 
             {/* --- Gemini AI による文章解説機能 --- */}

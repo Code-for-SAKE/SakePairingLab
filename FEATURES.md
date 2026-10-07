@@ -20,8 +20,10 @@ Gemini API による埋め込み（Embedding）生成と Firestore のベクト�
   - 表示名、アバター画像、貢献スコア（Contribution Score）、称号（Title）の表示
   - 表示名の変更（設定画面）
 - **個人の嗜好分析 (`/mypage`)**:
-  - 自身のレビューと全体傾向との差分から、好みや感じ取り方の偏りを分析
-  - Gemini が嗜好ベクトルと直近のレビューコメントをもとに、好みに合う日本酒やペアリングを文章で解説
+  - レビュー投稿時にバックエンドで世間平均との差分（知覚バイアスベクトル: 1024次元）を自動計算・逐次蓄積（$O(1)$ の高速表示）
+  - 蓄積された差分ベクトルをカテゴリワードの埋め込みベクトル空間へ動的に射影し、世間一般（50基準）に対する感度や好みの偏りをレーダーチャートで可視化
+  - 軸となるカテゴリ定義の柔軟な変更・拡張に対応（Embeddingキャッシュ機能付き）
+  - Gemini が志向ベクトルと直近のレビューコメントをもとに、味覚の癖や好みに合う日本酒・ペアリングを文章で解説
 - **個人用 Gemini API キー設定**:
   - ユーザー個人の Gemini API キーをブラウザ（localStorage）に安全に保存・管理
   - APIキーを登録することで、AIレビュー生成や画像生成などの高度な機能を利用可能
@@ -79,7 +81,7 @@ Gemini API による埋め込み（Embedding）生成と Firestore のベクト�
 
 - **マイページ・テイスティング傾向チャート (`/mypage`)**:
   - Recharts によるレーダーチャート表示
-  - 自身のレビュー履歴から「フルーティ」「スッキリ」「熟成」「旨味」「酸味」「甘味」の飲用・評価バランスを可視化
+  - ユーザー固有の1024次元差分ベクトルと、各フレーバー軸（フルーティ、スッキリ、熟成、旨味、酸味、甘味等）のコサイン類似度から、世間基準（50）に対する感度の偏りを動的に算出・可視化
 - **3D天球・球面MDSマップ (`/explore/sake`, `GlobeVisualizer`)**:
   - Three.js / React Three Fiber を用いた3D天球ビジュアライザー
   - 1024次元の埋め込みベクトルを古典的多次元尺度構成法（Classical MDS）により3次元球面上に投影
@@ -113,12 +115,12 @@ Gemini API による埋め込み（Embedding）生成と Firestore のベクト�
   - レビュー投稿時に自動実行
   - 前半1024次元（日本酒スペック＋温度＋酒器＋おつまみ）と後半1024次元（香り＋味わい＋評価）を結合し、2048次元の複合ベクトルをレビューに保存
   - レビューの後半ベクトルを使って、日本酒本体の埋め込みベクトルを加重平均ブレンドで動的アップデート（レビューが集まるほど味の表現が洗練される）
+  - **ユーザーの味覚差分ベクトルの逐次更新**: 今回のレビューの味わいベクトルと日本酒の標準ベクトルの差分 $\Delta = v_{\text{review}} - v_{\text{sake}}$ を計算し、ユーザープロファイル（`users/{userId}.tasteProfile.biasVector`）に累積平均として蓄積
 - **`searchSakesByVector` / `searchSakesByText` (Callable Function)**:
   - ベクトルまたはテキストを受け取り、Firestore のベクトルインデックスから近傍検索を実行
-- **管理者専用バッチ処理 (`rebuildAllSakeEmbeddings`, `rebuildSakeEmbeddingById`)**:
-  - 全てまたは特定の日本酒の埋め込みベクトルをスペック＋全レビューの重心から一括再計算
-- **ネットワークデータ構築 (`rebuildSakeNetworkData`, `getNetworkDataVector`)**:
-  - 全日本酒データをバッチ取得して `ml-kmeans` でクラスタリングし、リンクを生成して `sakeNetwork/latest` にキャッシュ
+- **管理者専用バッチ・生成スクリプト (`regenerateCategoryVectors`, `rebuildAllSakeEmbeddings`)**:
+  - `regenerateCategoryVectors`: `DEFAULT_TASTE_CATEGORIES` の各カテゴリ記述文から Gemini で1024次元Embeddingを生成し、ダウンロードする。`src/data/categoryVectors.json` として静的保存
+  - `rebuildAllSakeEmbeddings`: 全てまたは特定の日本酒の埋め込みベクトルをスペック＋全レビューの重心から一括再計算
 
 ---
 

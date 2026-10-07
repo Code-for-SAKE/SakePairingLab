@@ -117,7 +117,7 @@ ${pastCommentsText}
 }
 
 /**
- * Generates text embedding for search query using Gemini text-embedding-004.
+ * Generates text embedding for search query using Gemini gemini-embedding-001.
  */
 export async function generateQueryEmbedding(text: string, dimension: number): Promise<number[]> {
   const apiKey = await resolveApiKey();

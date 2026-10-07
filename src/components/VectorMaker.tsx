@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { generateQueryEmbedding } from '../lib/gemini';
 import { AccordionItem } from './AccordionItem';
-import { TextVector } from '../dummyTypes';
+import { TextVector } from '../types';
 
 interface VectorMakerProps {
   initialVectors?: TextVector[];

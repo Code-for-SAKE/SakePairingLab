@@ -239,6 +239,42 @@ export const onReviewCreated = onDocumentWritten(
       updatedAt: FieldValue.serverTimestamp(),
       reviewCount: FieldValue.increment(1),
     });
+
+    // 7. ユーザーのtasteProfile（世間平均との差分ベクトル）を逐次更新
+    if (reviewData.userId && sakeEmbedding.length === 1024 && resultVector1024.length === 1024) {
+      try {
+        const diffVector = resultVector1024.map((val, idx) => val - sakeEmbedding[idx]);
+        const userRef = db.collection('users').doc(reviewData.userId);
+        const userSnap = await userRef.get();
+
+        if (userSnap.exists) {
+          const userData = userSnap.data();
+          const userTasteProfile = userData?.tasteProfile || {};
+          const count = userTasteProfile.reviewCount || 0;
+          const currentBias = userTasteProfile.biasVector || [];
+
+          let newBiasVector: number[];
+          if (Array.isArray(currentBias) && currentBias.length === diffVector.length && count > 0) {
+            newBiasVector = currentBias.map(
+              (v: number, i: number) => (v * count + diffVector[i]) / (count + 1),
+            );
+          } else {
+            newBiasVector = diffVector;
+          }
+
+          await userRef.update({
+            tasteProfile: {
+              biasVector: newBiasVector,
+              reviewCount: count + 1,
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+          });
+        }
+      } catch (userProfileErr) {
+        console.error('Error updating user taste profile:', userProfileErr);
+      }
+    }
+
     console.log(`Successfully generated embedding for review ${event.params.reviewId}`);
   },
 );
