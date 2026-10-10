@@ -11,6 +11,7 @@ import {
   getOrthogonalVector,
 } from '../lib/calc';
 import { generateQueryEmbedding, generateVectorAnalysisComment } from '../lib/gemini';
+import { MarkdownContent } from './MarkdownContent';
 import chroma from 'chroma-js';
 import { TextVector, DimensionPosition } from '../types';
 
@@ -685,7 +686,9 @@ export const GlobeVisualizer: React.FC<GlobeVisualizerProps> = (props: GlobeVisu
                       再生成
                     </button>
                   </div>
-                  <div className="whitespace-pre-wrap text-slate-300">{aiAnalysisResult}</div>
+                  <MarkdownContent variant="dark" className="max-h-48 overflow-y-auto">
+                    {aiAnalysisResult}
+                  </MarkdownContent>
                 </div>
               )}
             </div>

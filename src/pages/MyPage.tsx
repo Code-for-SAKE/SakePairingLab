@@ -27,6 +27,7 @@ import { enrichReviews } from '../lib/review';
 import { ReviewCard } from '../components/ReviewCard';
 import LoadMoreTrigger from '../components/LoadMoreTrigger';
 import { generateUserTasteAnalysis } from '../lib/gemini';
+import { MarkdownContent } from '../components/MarkdownContent';
 
 import {
   DEFAULT_TASTE_CATEGORIES,
@@ -372,9 +373,9 @@ export default function MyPage() {
                       <span>再生成</span>
                     </button>
                   </div>
-                  <div className="whitespace-pre-wrap text-slate-300 leading-relaxed pt-1">
+                  <MarkdownContent variant="dark" className="pt-1">
                     {aiAnalysisResult}
-                  </div>
+                  </MarkdownContent>
                 </div>
               )}
             </div>
