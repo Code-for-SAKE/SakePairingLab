@@ -3,7 +3,7 @@ import { Search, Plus, Loader2, Sparkles, RefreshCw, Compass } from 'lucide-reac
 import { Link } from 'react-router-dom';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app, db } from '../lib/firebase';
-import { NetworkResponse, Sake } from '../types';
+import { NetworkResponse, SakeSearchResult } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { generateQueryEmbedding, hasUserApiKey } from '../lib/gemini';
 import { SakeCard } from '../components/SakeCard';
@@ -11,7 +11,7 @@ import { collection, getCountFromServer } from 'firebase/firestore';
 
 const SEARCH_STATE_KEY = 'sake-explore-search-state';
 
-function readSearchState(): { query: string; results: Sake[] | null } {
+function readSearchState(): { query: string; results: SakeSearchResult[] | null } {
   try {
     const savedState = sessionStorage.getItem(SEARCH_STATE_KEY);
     if (!savedState) return { query: '', results: null };
@@ -19,7 +19,7 @@ function readSearchState(): { query: string; results: Sake[] | null } {
     const parsed = JSON.parse(savedState);
     return {
       query: typeof parsed.query === 'string' ? parsed.query : '',
-      results: Array.isArray(parsed.results) ? (parsed.results as Sake[]) : null,
+      results: Array.isArray(parsed.results) ? (parsed.results as SakeSearchResult[]) : null,
     };
   } catch {
     return { query: '', results: null };
@@ -35,7 +35,7 @@ export default function ExplorePage() {
   const [isComposing, setIsComposing] = useState(false);
 
   // Vector Search States
-  const [vectorResults, setVectorResults] = useState<Sake[] | null>(
+  const [vectorResults, setVectorResults] = useState<SakeSearchResult[] | null>(
     () => readSearchState().results,
   );
   const [isSearchingVector, setIsSearchingVector] = useState(false);
@@ -56,7 +56,7 @@ export default function ExplorePage() {
         const functions = getFunctions(app);
         const searchByVector = httpsCallable<
           { queryVector: number[]; limit?: number },
-          { success: boolean; results: Sake[] }
+          { success: boolean; results: SakeSearchResult[] }
         >(functions, 'searchSakesByVector');
 
         const vector = await generateQueryEmbedding(query, 1024);
@@ -82,7 +82,7 @@ export default function ExplorePage() {
         const functions = getFunctions(app);
         const searchSakesByText = httpsCallable<
           { queryText: string; limit?: number },
-          { success: boolean; results: Sake[] }
+          { success: boolean; results: SakeSearchResult[] }
         >(functions, 'searchSakesByText');
 
         const res = await searchSakesByText({ queryText: query, limit: 10 });
@@ -165,20 +165,27 @@ export default function ExplorePage() {
   };
 
   const handleRebuildAllEmbeddings = async () => {
-    if (!window.confirm('全ての日本酒のEmbedding（ベクトル）を再生成しますか？')) {
-      return;
-    }
+    const answer = window.prompt(
+      '全ての日本酒のEmbedding（ベクトル）を再生成しますか？\n\n' +
+        '・通常更新（既存ベクトル活用、レビュー反映）: 「1」を入力\n' +
+        '・スペック再作成（spec=true、基本情報も再ベクトル化）: 「2」を入力\n' +
+        '・キャンセル: キャンセルボタンまたは空欄',
+      '1',
+    );
+    if (!answer) return;
+    const rebuildSpec = answer.trim() === '2';
+
     setIsRebuilding(true);
     setRebuildMessage(null);
     try {
       const functions = getFunctions(app);
       const rebuildAll = httpsCallable<
-        { reindexAll?: boolean },
+        { spec?: boolean; reindexAll?: boolean },
         { success: boolean; count: number; total: number }
       >(functions, 'rebuildAllSakeEmbeddings');
-      const res = await rebuildAll({});
+      const res = await rebuildAll({ spec: rebuildSpec });
       setRebuildMessage(
-        `✅ ${res.data.count}件 / 全${res.data.total}件 のEmbeddingを正常に生成・更新しました。`,
+        `✅ ${res.data.count}件 / 全${res.data.total}件 のEmbeddingを正常に生成・更新しました。${rebuildSpec ? ' (スペック再作成含む)' : ' (既存ベクトル利用)'}`,
       );
     } catch (err: any) {
       console.error('Error rebuilding embeddings:', err);
@@ -273,7 +280,7 @@ export default function ExplorePage() {
         <input
           type="text"
           className="block w-full pl-10 pr-24 py-3 border border-slate-200 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-shadow shadow-sm"
-          placeholder="銘柄・特徴・味の好みでAI検索... (例: 肉に合うフルーティな酒)"
+          placeholder="酒蔵・銘柄・特徴・味の好みでAI検索... (例: 旭酒造、フルーティな酒)"
           value={query}
           onKeyDown={handleKeyDown}
           onCompositionStart={() => setIsComposing(true)}

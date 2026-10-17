@@ -30,6 +30,13 @@ export type Sake = {
   reviewCount: number;
 };
 
+export type SakeSearchResult = Sake & {
+  similarity?: number;
+  basicSimilarity?: number;
+  tasteSimilarity?: number;
+  matchType?: 'basic' | 'taste' | 'both';
+};
+
 export type TasteProfile = {
   broads: string[];
   specific: string[];

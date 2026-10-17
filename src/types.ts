@@ -27,6 +27,14 @@ export type Sake = {
   createdAt?: any;
   createdBy?: string;
   embedding?: VectorValue;
+  reviewCount?: number;
+};
+
+export type SakeSearchResult = Sake & {
+  similarity?: number;
+  basicSimilarity?: number;
+  tasteSimilarity?: number;
+  matchType?: 'basic' | 'taste' | 'both';
 };
 
 export type TasteProfile = {
