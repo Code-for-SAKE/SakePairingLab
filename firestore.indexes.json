@@ -32,7 +32,7 @@
         {
           "fieldPath": "embedding",
           "vectorConfig": {
-            "dimension": 1024,
+            "dimension": 2048,
             "flat": {}
           }
         }
